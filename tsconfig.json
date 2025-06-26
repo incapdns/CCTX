@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "moduleResolution": "node10",
+    "esModuleInterop": true,
+    "target": "es2024",
+    "sourceMap": true,
+    "outDir": "dist",
+    "types": [
+      "node"
+    ],
+    "resolveJsonModule": true,
+  },
+  "lib": [
+    "es2024"
+  ]
+}
