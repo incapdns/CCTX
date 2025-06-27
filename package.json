@@ -1,0 +1,22 @@
+{
+  "name": "cctx",
+  "version": "1.0.0",
+  "main": "index.js",
+  "dependencies": {
+    "ccxt": "^4.4.91",
+    "decimal.js": "^10.5.0",
+    "undici": "^6.21.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.1",
+    "typed-emitter": "^2.1.0",
+    "typescript": "^5.8.3"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": ""
+}

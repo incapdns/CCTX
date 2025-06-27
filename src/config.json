@@ -1,0 +1,15 @@
+{
+    "exchanges": {
+        "mexc": {
+            "enableRateLimit": false,
+            "apiKey": "A",
+            "secret": "B",
+            "options": {
+                "defaultType": "spot",
+                "adjustForTimeDifference": true,
+                "recvWindow": 10000
+            },
+            "webToken": "C"
+        }
+    }
+}
