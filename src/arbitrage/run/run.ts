@@ -69,7 +69,9 @@ export const runArbitrage = async ({ symbol, exchange, amount, ...other }: Arbit
 
   const step: Step = {
     direction: ArbitrageDirection.Entry,
-    executed: false
+    executed: false,
+    spot: {},
+    future: {}
   }
 
   const arbitrageNonce: ArbitrageNonce = {
@@ -113,49 +115,41 @@ export const runArbitrage = async ({ symbol, exchange, amount, ...other }: Arbit
 
     while (exchange.running.includes(symbol) && !step.executed) {
       try {
-        step.spot = {
-          promise: exchange
-            .getManager()
-            .watchOrderBook(symbol, 10)
-            .then(result => (
-              step.spot.result = result,
-              stepFn({
-                exchange,
-                symbol,
-                entry,
-                step,
-                arbitrageNonce,
-                timeout: other.timeout,
-                spotOrdersCatch,
-                futureOrdersCatch
-              })
-            ))
-            .catch(rethrow),
+        step.spot.promise = exchange
+          .getManager()
+          .watchOrderBook(symbol, 10)
+          .then(result => (
+            step.spot.result = result,
+            stepFn({
+              exchange,
+              symbol,
+              entry,
+              step,
+              arbitrageNonce,
+              timeout: other.timeout,
+              spotOrdersCatch,
+              futureOrdersCatch
+            })
+          ))
+          .catch(rethrow)
 
-          result: step.spot?.result
-        }
-
-        step.future = {
-          promise: exchange
-            .getManager()
-            .watchOrderBook(`${symbol}:USDT`, 10)
-            .then(result => (
-              step.future.result = result,
-              stepFn({
-                exchange,
-                symbol,
-                entry,
-                step,
-                arbitrageNonce,
-                spotOrdersCatch,
-                futureOrdersCatch,
-                timeout: other.timeout
-              })
-            ))
-            .catch(rethrow),
-
-          result: step.future?.result
-        }
+        step.future.promise = exchange
+          .getManager()
+          .watchOrderBook(`${symbol}:USDT`, 10)
+          .then(result => (
+            step.future.result = result,
+            stepFn({
+              exchange,
+              symbol,
+              entry,
+              step,
+              arbitrageNonce,
+              spotOrdersCatch,
+              futureOrdersCatch,
+              timeout: other.timeout
+            })
+          ))
+          .catch(rethrow)
 
         await Promise.all([
           step.spot.promise,
