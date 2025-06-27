@@ -4,16 +4,16 @@ import { doArbitrage } from '../../compute';
 import { ArbitrageDirection, ArbitrageOrder } from "../../compute/common";
 import { CancelOrderError } from '../cancel';
 import { CatchReturn, OrderCatch } from "../catch";
-import { createOrderValidator, CurrentArbitrageNonce, prepareCreateOrder, Step, syncOrder } from '../common';
+import { createOrderValidator, ArbitrageNonce, prepareCreateOrder, Step, syncOrder } from '../common';
 import { Entry } from '../run';
-import { rejectTimeout, Result, retryOrder } from "./common";
+import { isVolatile, rejectTimeout, Result, retryOrder, VolatileDirection } from "./common";
 
 interface ExitArbitrage {
   exchange: Exchange,
   symbol: string,
   entry: Entry,
   step: Step,
-  currentArbitrageNonce: CurrentArbitrageNonce,
+  arbitrageNonce: ArbitrageNonce,
   spotOrdersCatch: OrderCatch,
   futureOrdersCatch: OrderCatch,
   timeout: number
@@ -24,7 +24,7 @@ export const runExitArbitrage = async ({
   symbol,
   entry,
   step,
-  currentArbitrageNonce,
+  arbitrageNonce,
   spotOrdersCatch,
   futureOrdersCatch,
   timeout
@@ -33,8 +33,8 @@ export const runExitArbitrage = async ({
 
   if (!step.future?.result || !step.spot?.result) return
 
-  const sameSpot = currentArbitrageNonce.spot == step.spot?.result?.nonce
-  const sameFuture = currentArbitrageNonce.future == step.future?.result?.nonce
+  const sameSpot = arbitrageNonce.spot == step.spot?.result?.nonce
+  const sameFuture = arbitrageNonce.future == step.future?.result?.nonce
 
   if (sameFuture && sameSpot) return
 
@@ -63,13 +63,20 @@ export const runExitArbitrage = async ({
     executed: entry.executed
   })
 
-  currentArbitrageNonce.spot = step.spot.result.nonce
-  currentArbitrageNonce.future = step.future.result.nonce
+  arbitrageNonce.spot = step.spot.result.nonce
+  arbitrageNonce.future = step.future.result.nonce
 
   if (!exitArbitrage.completed) return
 
-  if (exitArbitrage.maxPrice.spot == exitArbitrage.spotOrders[0].price ||
-    exitArbitrage.maxPrice.future == exitArbitrage.futureOrders[0].price)
+  const validSpot = 
+    exitArbitrage.spotOrders[0].price != exitArbitrage.maxPrice.spot ||
+    !isVolatile(step, VolatileDirection.Spot, exitArbitrage.maxPrice.spot)
+
+  const validFuture = 
+    exitArbitrage.futureOrders[0].price != exitArbitrage.maxPrice.future ||
+    !isVolatile(step, VolatileDirection.Future, exitArbitrage.maxPrice.future)
+
+  if(!validFuture || !validSpot)
     return
 
   if (!step.executed &&

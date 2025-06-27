@@ -3,7 +3,7 @@ import { Exchange } from "../../exchange";
 import { ArbitrageDirection } from "../compute/common";
 import { CancelOrderError, tryCancel } from './cancel';
 import { catchOrders, CatchReturn } from './catch';
-import { CurrentArbitrageNonce, prepareCreateOrder, Step, syncOrder } from './common';
+import { ArbitrageNonce, prepareCreateOrder, Step, syncOrder } from './common';
 import { runEntryArbitrage } from './steps/entry';
 import { runExitArbitrage } from './steps/exit';
 import Decimal from "decimal.js";
@@ -72,7 +72,7 @@ export const runArbitrage = async ({ symbol, exchange, amount, ...other }: Arbit
     executed: false
   }
 
-  const currentArbitrageNonce: CurrentArbitrageNonce = {
+  const arbitrageNonce: ArbitrageNonce = {
     spot: 0,
     future: 0
   }
@@ -124,7 +124,7 @@ export const runArbitrage = async ({ symbol, exchange, amount, ...other }: Arbit
                 symbol,
                 entry,
                 step,
-                currentArbitrageNonce,
+                arbitrageNonce,
                 timeout: other.timeout,
                 spotOrdersCatch,
                 futureOrdersCatch
@@ -146,7 +146,7 @@ export const runArbitrage = async ({ symbol, exchange, amount, ...other }: Arbit
                 symbol,
                 entry,
                 step,
-                currentArbitrageNonce,
+                arbitrageNonce,
                 spotOrdersCatch,
                 futureOrdersCatch,
                 timeout: other.timeout
@@ -200,8 +200,8 @@ export const runArbitrage = async ({ symbol, exchange, amount, ...other }: Arbit
     step.direction = ArbitrageDirection.Exit
     delete step.future
     delete step.spot
-    delete currentArbitrageNonce.future
-    delete currentArbitrageNonce.spot
+    delete arbitrageNonce.future
+    delete arbitrageNonce.spot
   }
 
   await exit()

@@ -13,17 +13,19 @@ export interface Step {
   executed: boolean;
   spot?: {
     promise?: Promise<void>,
-    result?: OrderBook
+    result?: OrderBook,
+    lastPrice?: [number, number],
   },
   future?: {
     promise?: Promise<void>,
-    result?: OrderBook
+    result?: OrderBook,
+    lastPrice?: [number, number],
   },
   promise?: Promise<OrderSnapshot>,
   resolve?: (orders: OrderSnapshot) => void,
 }
 
-export interface CurrentArbitrageNonce {
+export interface ArbitrageNonce {
   spot?: number,
   future?: number
 }
