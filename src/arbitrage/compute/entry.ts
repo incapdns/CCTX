@@ -13,13 +13,6 @@ const isOutsideTolerance = (base: Decimal.Value, target: Decimal.Value, percent:
   return targetDecimal.lt(lowerBound) || targetDecimal.gt(upperBound);
 }
 
-const limitToPrecision = (value: Decimal.Value, reference: Decimal.Value): Decimal => {
-  const result = Decimal(value)
-    .toDecimalPlaces(Decimal(reference).dp(), Decimal.ROUND_DOWN)
-
-  return result
-}
-
 export const doEntryArbitrage = ({
   spotBook,
   futureBook,

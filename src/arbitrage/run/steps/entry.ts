@@ -22,6 +22,13 @@ interface EntryArbitrage {
 
 const percent = 0.40
 
+const limitToPrecision = (value: Decimal.Value, reference: Decimal.Value): Decimal => {
+  const result = Decimal(value)
+    .toDecimalPlaces(Decimal(reference).dp(), Decimal.ROUND_DOWN)
+
+  return result
+}
+
 export const runEntryArbitrage = async ({
   exchange,
   symbol,
@@ -73,6 +80,15 @@ export const runEntryArbitrage = async ({
   if (!step.executed &&
     step.direction == ArbitrageDirection.Entry) {
     step.executed = true
+    
+    const contractSize = futureMarket.contractSize ?? 1
+
+    const contractQuantity =
+      limitToPrecision(Decimal(entryArbitrage.executed).div(contractSize), futureMarket?.precision.amount ?? 1)
+
+    entryArbitrage.executed = contractQuantity
+      .mul(contractSize)
+      .toNumber()
 
     entry.profitPercent = entryArbitrage.profitPercent
     entry.executed = entryArbitrage.executed
@@ -139,10 +155,10 @@ export const runEntryArbitrage = async ({
       clearTimeout(result.nextSpot?.timeout)
       clearTimeout(result.nextFuture?.timeout)
 
-      if(result.nextSpot?.entered)
+      if (result.nextSpot?.entered)
         await result.nextSpot?.promise
 
-      if(result.nextFuture?.entered)
+      if (result.nextFuture?.entered)
         await result.nextFuture?.promise
     }
 
@@ -161,10 +177,10 @@ export const runEntryArbitrage = async ({
           ])
         ]) as [CatchReturn, CatchReturn]
 
-        if(spot.nonce != undefined)
+        if (spot.nonce != undefined)
           lastNonces.spot = spot.nonce
 
-        if(future.nonce != undefined)
+        if (future.nonce != undefined)
           lastNonces.future = future.nonce
 
         syncOrder([result.spotOrder], spot)
