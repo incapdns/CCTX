@@ -30,7 +30,7 @@ export type ArbitrageResults = {
 
 export type ArbitrageResult<Direction extends ArbitrageDirection> = ArbitrageResults[Direction]
 
-export const cleanResidual = (value: Decimal, epsilon = new Decimal('1e-10')): Decimal =>
+export const cleanResidual = (value: Decimal, epsilon = new Decimal('1e-12')): Decimal =>
   value.abs().lt(epsilon) ? new Decimal(0) : value
 
 export interface CommonRequest {
