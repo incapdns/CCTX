@@ -77,6 +77,10 @@ export const runEntryArbitrage = async ({
 
   if (!entryArbitrage.completed) return
 
+  if(entryArbitrage.maxPrice.spot == entryArbitrage.spotOrders[0].price ||
+    entryArbitrage.maxPrice.future == entryArbitrage.futureOrders[0].price)
+    return
+
   if (!step.executed &&
     step.direction == ArbitrageDirection.Entry) {
     step.executed = true
@@ -237,8 +241,8 @@ export const runEntryArbitrage = async ({
     await clearAndWait()
 
     step.resolve({
-      spotOrder: spotOrder.value,
-      futureOrder: futureOrder.value
+      spotOrder: result.spotOrder,
+      futureOrder: result.futureOrder
     })
   }
 }

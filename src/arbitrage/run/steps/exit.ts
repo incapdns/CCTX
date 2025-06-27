@@ -53,7 +53,7 @@ export const runExitArbitrage = async ({
   const spotMarket = manager.market(symbol)
   const futureMarket = manager.market(`${symbol}:USDT`)
 
-  const percent = -(entry.profitPercent - 0.40)
+  const percent = 0
 
   const exitArbitrage = doArbitrage({
     direction: ArbitrageDirection.Exit,
@@ -67,6 +67,10 @@ export const runExitArbitrage = async ({
   currentArbitrageNonce.future = step.future.result.nonce
 
   if (!exitArbitrage.completed) return
+
+  if (exitArbitrage.maxPrice.spot == exitArbitrage.spotOrders[0].price ||
+    exitArbitrage.maxPrice.future == exitArbitrage.futureOrders[0].price)
+    return
 
   if (!step.executed &&
     step.direction == ArbitrageDirection.Exit) {
@@ -147,10 +151,10 @@ export const runExitArbitrage = async ({
           ]),
         ]) as [CatchReturn, CatchReturn]
 
-        if(spot.nonce != undefined)
+        if (spot.nonce != undefined)
           lastNonces.spot = spot.nonce
 
-        if(future.nonce != undefined)
+        if (future.nonce != undefined)
           lastNonces.future = future.nonce
 
         syncOrder([result.spotOrder], spot)
@@ -207,8 +211,8 @@ export const runExitArbitrage = async ({
     await clearAndWait()
 
     step.resolve({
-      spotOrder: spotOrder.value,
-      futureOrder: futureOrder.value
+      spotOrder: result.spotOrder,
+      futureOrder: result.futureOrder
     })
   }
 }
