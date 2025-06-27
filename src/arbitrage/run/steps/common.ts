@@ -2,7 +2,7 @@ import { Market, Order } from "ccxt";
 import { Exchange } from "../../../exchange";
 import { ArbitrageOrder } from "../../compute/common";
 import { OrderCatch } from "../catch";
-import { cancelWithRetry, syncOrder } from "../common";
+import { cancelWithRetry, Step, syncOrder } from "../common";
 
 export const rejectTimeout = <T>(ms: number): {
   promise: Promise<T>,
@@ -63,7 +63,7 @@ export const retryOrder = (
 
       if (result[key].remaining == 0)
         return resolver()
-      
+
       let lastNonce = current.nonce
 
       while (!['canceled', 'closed', 'filled'].includes(result[key].status)) {
@@ -93,4 +93,31 @@ export const retryOrder = (
       resolver()
     }, 3000)
   }
+}
+
+export enum VolatileDirection {
+  Spot,
+  Future
+}
+
+export const isVolatile = (
+  step: Step,
+  direction: VolatileDirection,
+  lastPrice: number
+): boolean => {
+  const now = Date.now()
+
+  const target = direction === VolatileDirection.Spot ? step.spot : step.future
+
+  if (!target?.lastPrice)
+    target!.lastPrice = [lastPrice, now]
+
+  const [prevPrice, timestamp] = target!.lastPrice
+  const timeDiff = now - timestamp
+  const changed = prevPrice !== lastPrice
+
+  if (changed)
+    target!.lastPrice = [lastPrice, now]
+
+  return changed || timeDiff < 3000
 }
