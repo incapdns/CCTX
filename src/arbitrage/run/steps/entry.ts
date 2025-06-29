@@ -68,6 +68,8 @@ export const runEntryArbitrage = async ({
     marginQuantityPercent: 10
   })
 
+  entryArbitrage.executed *= 0.8;
+
   arbitrageNonce.spot = step.spot.result.nonce
   arbitrageNonce.future = step.future.result.nonce
 
