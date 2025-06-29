@@ -1,7 +1,7 @@
-import { Exchange as CcxtExchange, Market, Order, OrderBook, OrderSide, errors } from 'ccxt';
-import { ArbitrageDirection, ArbitrageOrder } from "../compute/common";
+import { Exchange as CcxtExchange, Market, Order, OrderBook, OrderSide } from 'ccxt';
 import Decimal from 'decimal.js';
 import { Exchange } from '../../exchange';
+import { ArbitrageOrder } from "../compute/common";
 
 export interface OrderSnapshot {
   spotOrder: Order,

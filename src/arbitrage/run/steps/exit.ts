@@ -2,6 +2,7 @@ import { Order } from 'ccxt';
 import { Exchange } from "../../../exchange";
 import { doArbitrage } from '../../compute';
 import { ArbitrageDirection } from "../../compute/common";
+import { isOutsideTolerance } from '../../compute/entry';
 import { CancelOrderError } from '../cancel';
 import { CatchReturn, OrderCatch } from '../catch';
 import { ArbitrageNonce, createOrderValidator, prepareCreateOrder, Step, syncOrder } from '../common';
@@ -130,9 +131,9 @@ export const runExitArbitrage = async ({
     .orders
     .slice(-10)
     .find(order =>
-      order[0] == spotArbitrageOrder.price &&
+      !isOutsideTolerance(order[0], spotArbitrageOrder.price, 25) &&
       order[1] == spotArbitrageOrder.quantity &&
-      order[2] == futureArbitrageOrder.price &&
+      !isOutsideTolerance(order[2], futureArbitrageOrder.price, 25) &&
       order[3] == futureArbitrageOrder.quantity &&
       order[4] >= Date.now() - 5000
     )

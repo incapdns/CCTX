@@ -128,9 +128,9 @@ export const runEntryArbitrage = async ({
     .orders
     .slice(-10)
     .find(order =>
-      order[0] == spotArbitrageOrder.price &&
+      !isOutsideTolerance(order[0], spotArbitrageOrder.price, 25) &&
       order[1] == spotArbitrageOrder.quantity &&
-      order[2] == futureArbitrageOrder.price &&
+      !isOutsideTolerance(order[2], futureArbitrageOrder.price, 25) &&
       order[3] == futureArbitrageOrder.quantity &&
       order[4] >= Date.now() - 5000
     )

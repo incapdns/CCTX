@@ -123,10 +123,16 @@ const redo = async (
   const redoSpot = prepareCreateOrder(manager, symbol, 'sell')
   const redoFuture = prepareCreateOrder(manager, `${symbol}:USDT`, 'buy', true)
 
-  const [spotOrder, futureOrder] = await Promise.all([
+  let [spotOrder, futureOrder] = await Promise.all([
     quantity.spot > 0 ? redoSpot(undefined, quantity.spot) : snapshot.spotOrder,
     quantity.future > 0 ? redoFuture(undefined, quantity.future) : snapshot.futureOrder
   ])
+
+  if(!spotOrder)
+    spotOrder = {} as Order
+
+  if(!futureOrder)
+    futureOrder = {} as Order
 
   spotOrder.info = { 
     source: 'redo',

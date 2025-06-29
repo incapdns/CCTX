@@ -1,12 +1,12 @@
 import { Order, OrderBook } from "ccxt";
 import { Exchange } from "../../exchange";
 import { ArbitrageDirection } from "../compute/common";
+import { isOutsideTolerance } from "../compute/entry";
 import { CancelOrderError, tryCancel } from './cancel';
 import { catchOrders, CatchReturn, OrderCatch } from './catch';
 import { ArbitrageNonce, OrderSnapshot, Step, StepManager, syncOrder } from './common';
 import { runEntryArbitrage } from './steps/entry';
 import { runExitArbitrage } from './steps/exit';
-import { isOutsideTolerance } from "../compute/entry";
 
 export interface Arbitrage {
   symbol: string,
