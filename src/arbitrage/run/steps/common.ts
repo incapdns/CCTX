@@ -208,17 +208,23 @@ export const computeOrders = (
   entry: Entry,
   exchange: Exchange,
   limit: number,
-  arbitrage: ArbitrageResult<ArbitrageDirection.Entry> | ArbitrageResult<ArbitrageDirection.Exit>,
+  arbitrage:
+    | ArbitrageResult<ArbitrageDirection.Entry>
+    | ArbitrageResult<ArbitrageDirection.Exit>,
   spotMarket: Market,
   futureMarket: Market,
   validOrder: (order: ArbitrageOrder, market: Market) => boolean
 ): MaybeOrders => {
   const manager = exchange.getManager()
 
-  const spotMin = spotMarket.limits?.amount?.min ?? 0
-  const contractSize = futureMarket.contractSize ?? 1
-  const futureMinContracts = futureMarket.limits?.amount?.min ?? 0
-  const futureMin = futureMinContracts * contractSize
+  const spotMinQty     = spotMarket.limits?.amount?.min ?? 0
+  const contractSize   = futureMarket.contractSize ?? 1
+  const futureMinQty   = (futureMarket.limits?.amount?.min ?? 0) * contractSize
+
+  const spotMinCost    = spotMarket.limits?.cost?.min ?? 0
+  const futureMinCost  = futureMarket.limits?.cost?.min ?? 0
+
+  const COST_BUFFER    = 1.02
 
   let executed = Math.min(arbitrage.executed, limit)
 
@@ -229,35 +235,46 @@ export const computeOrders = (
       spotMarket,
       futureMarket
     )
-    if (executed <= 0)
-      return null
+    if (executed <= 0) return null
 
     const nextRemaining = entry.remainingQuantity - executed
 
-    const diffSpot = spotMin - nextRemaining
-    const diffFuture = futureMin - nextRemaining
+    const diffQtySpot   = spotMinQty   - nextRemaining
+    const diffQtyFuture = futureMinQty - nextRemaining
 
-    if (nextRemaining > 0 &&
-       (diffSpot > 0 || diffFuture > 0)) 
-    {
-      const adjust = Math.max(diffSpot, diffFuture)
-      executed -= adjust
+    const reqQtyByCostSpot = (spotMinCost * COST_BUFFER)  / arbitrage.maxPrice.spot
+    const reqQtyByCostFut  = (futureMinCost * COST_BUFFER) / arbitrage.maxPrice.future
+
+    const diffCostSpot   = reqQtyByCostSpot   - nextRemaining
+    const diffCostFuture = reqQtyByCostFut    - nextRemaining
+
+    if (nextRemaining > 0 && (
+      diffQtySpot   > 0 ||
+      diffQtyFuture > 0 ||
+      diffCostSpot  > 0 ||
+      diffCostFuture> 0
+    )) {
+      const maxGap = Math.max(
+        diffQtySpot,
+        diffQtyFuture,
+        diffCostSpot,
+        diffCostFuture
+      )
+      executed -= maxGap
       continue
     }
 
     const spotOrder: ArbitrageOrder = {
-      price: arbitrage.maxPrice.spot,
+      price:    arbitrage.maxPrice.spot,
       quantity: executed
     }
-    if (!validOrder(spotOrder, spotMarket))
-      continue
+    if (!validOrder(spotOrder, spotMarket))  continue
 
     const futureOrder: ArbitrageOrder = {
-      price: arbitrage.maxPrice.future,
+      price:    arbitrage.maxPrice.future,
       quantity: executed
     }
-    if (!validOrder(futureOrder, futureMarket))
-      continue
+    if (!validOrder(futureOrder, futureMarket)) continue
 
     return {
       spotArbitrageOrder: spotOrder,
