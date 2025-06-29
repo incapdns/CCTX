@@ -69,7 +69,7 @@ export const runEntryArbitrage = async ({
     contractSize: futureMarket.contractSize ?? 1
   })
 
-  if(!entryArbitrage.completed)
+  if (!entryArbitrage.completed)
     entryArbitrage.executed *= 0.8;
 
   arbitrageNonce.spot = step.spot.result.nonce
@@ -95,10 +95,10 @@ export const runEntryArbitrage = async ({
     validSpot = isVolatile(step, VolatileDirection.Spot, entryArbitrage.maxPrice.spot)
     validFuture = isVolatile(step, VolatileDirection.Future, entryArbitrage.maxPrice.future)
 
-    if(validSpot)
+    if (validSpot)
       step.spot!.lastPrice[1] = Date.now()
 
-    if(validFuture)
+    if (validFuture)
       step.future!.lastPrice[1] = Date.now()
   }
 
@@ -121,8 +121,30 @@ export const runEntryArbitrage = async ({
     validOrder
   ) ?? {}
 
-  if(!executed)
+  if (!executed)
     return
+
+  const exists = step
+    .orders
+    .slice(-10)
+    .find(order =>
+      order[0] == spotArbitrageOrder.price &&
+      order[1] == spotArbitrageOrder.quantity &&
+      order[2] == futureArbitrageOrder.price &&
+      order[3] == futureArbitrageOrder.quantity &&
+      order[4] >= Date.now() - 5000
+    )
+
+  if (exists)
+    return
+    
+  step.orders.push([
+    spotArbitrageOrder.price,
+    spotArbitrageOrder.quantity,
+    futureArbitrageOrder.price,
+    futureArbitrageOrder.quantity,
+    Date.now()
+  ])
 
   const [spotOrder, futureOrder] = await Promise.allSettled([
     createBuySpotOrder(spotArbitrageOrder),

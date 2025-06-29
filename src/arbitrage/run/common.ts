@@ -18,6 +18,8 @@ export interface Step {
     result?: OrderBook,
     lastPrice?: [number, number],
   }
+  orders: Array<[number, number, number, number, number]> 
+  // [spotPrice, spotQuantity, futurePrice, futureQuantity, timestamp]
 }
 
 export interface StepManager {

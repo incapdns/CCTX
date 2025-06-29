@@ -8,7 +8,7 @@ import { ArbitrageNonce, createOrderValidator, prepareCreateOrder, Step, syncOrd
 import { Entry } from '../run';
 import { computeOrders, isVolatile, rejectTimeout, Result, retryOrder, VolatileDirection, waitTimeout } from './common';
 
-interface exitArbitrage {
+interface ExitArbitrage {
   exchange: Exchange,
   symbol: string,
   entry: Entry,
@@ -30,7 +30,7 @@ export const runExitArbitrage = async ({
   spotOrdersCatch,
   futureOrdersCatch,
   timeout
-}: exitArbitrage) => {
+}: ExitArbitrage) => {
   if (step.executed)
     return
 
@@ -125,6 +125,28 @@ export const runExitArbitrage = async ({
 
   if(!spotArbitrageOrder || !futureArbitrageOrder)
     return
+
+  const exists = step
+    .orders
+    .slice(-10)
+    .find(order =>
+      order[0] == spotArbitrageOrder.price &&
+      order[1] == spotArbitrageOrder.quantity &&
+      order[2] == futureArbitrageOrder.price &&
+      order[3] == futureArbitrageOrder.quantity &&
+      order[4] >= Date.now() - 5000
+    )
+
+  if (exists)
+    return
+    
+  step.orders.push([
+    spotArbitrageOrder.price,
+    spotArbitrageOrder.quantity,
+    futureArbitrageOrder.price,
+    futureArbitrageOrder.quantity,
+    Date.now()
+  ])
 
   const [spotOrder, futureOrder] = await Promise.allSettled([
     createSellSpotOrder(spotArbitrageOrder),

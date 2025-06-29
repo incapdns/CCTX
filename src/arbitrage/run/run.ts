@@ -240,13 +240,15 @@ export const runArbitrage = async ({ symbol, exchange, quantity: amount, ...othe
     entry: {
       executed: false,
       spot: {},
-      future: {}
+      future: {},
+      orders: []
     },
     exit: {
       executed: false,
       spot: {},
-      future: {}
-    }
+      future: {},
+      orders: []
+    },
   }
 
   const arbitrageNonce: ArbitrageNonce = {
