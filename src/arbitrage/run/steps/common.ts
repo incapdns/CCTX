@@ -227,6 +227,19 @@ export const computeOrders = (
 
     const nextRemaining = entry.remainingQuantity - executed
 
+    if(nextRemaining <= 0)
+      return {
+        spotArbitrageOrder: {
+          price: arbitrage.maxPrice.spot,
+          quantity: executed
+        },
+        futureArbitrageOrder: {
+          price: arbitrage.maxPrice.future,
+          quantity: executed
+        },
+        executed
+      }
+
     const diffSpot = spotMin - nextRemaining
     const diffFuture = futureMin - nextRemaining
 
