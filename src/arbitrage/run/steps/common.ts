@@ -215,7 +215,7 @@ export const computeOrders = (
 
   let executed = Math.min(arbitrage.executed, limit)
 
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 10; i++) {
     executed = computeCommonQuantity(
       manager,
       executed,
