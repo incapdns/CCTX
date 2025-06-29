@@ -86,8 +86,8 @@ export const doExitArbitrage = ({ spotBook, futureBook, executed, percent }: Arb
     spotOrders: spotOrderResults,
     futureOrders: futuresOrderResults,
     maxPrice: {
-      spot: maxPrice.decreasing,
-      future: maxPrice.increasing
+      spot: maxPrice?.decreasing,
+      future: maxPrice?.increasing
     }
   }
 }

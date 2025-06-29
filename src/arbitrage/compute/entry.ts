@@ -142,8 +142,8 @@ export const doEntryArbitrage = ({
     futureOrders: futuresOrderResults,
     profitPercent: profitPercent.toNumber(),
     maxPrice: {
-      spot: maxPrice.increasing,
-      future: maxPrice.decreasing
+      spot: maxPrice?.increasing,
+      future: maxPrice?.decreasing
     }
   }
 }

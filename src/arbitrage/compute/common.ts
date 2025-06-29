@@ -68,7 +68,6 @@ export const findMaxPrice = (
   let i = 0;
   while (i < increasing.length && j >= 0) {
     const increasingPrice = increasing[i][0];
-    const increasingQuantity = increasing[i][1];
     const required = increasingPrice * (1 + percentage / 100);
 
     while (j >= 0 && decreasing[j][0] < required) {
@@ -78,7 +77,6 @@ export const findMaxPrice = (
     if (j < 0) break;
 
     const decreasingPrice = decreasing[j][0];
-    const decreasingQuantity = decreasing[j][1];
     const diffPercentage = ((decreasingPrice - increasingPrice) / increasingPrice) * 100;
     const excess = diffPercentage - percentage;
 
