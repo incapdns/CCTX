@@ -64,12 +64,13 @@ export const runEntryArbitrage = async ({
     spotBook: spotBook.asks,
     futureBook: futureBook.bids,
     percent,
-    amount: entry.quantity,
+    amount: entry.remainingQuantity,
     marginQuantityPercent: 10,
     contractSize: futureMarket.contractSize ?? 1
   })
 
-  entryArbitrage.executed *= 0.8;
+  if(!entryArbitrage.completed)
+    entryArbitrage.executed *= 0.8;
 
   arbitrageNonce.spot = step.spot.result.nonce
   arbitrageNonce.future = step.future.result.nonce

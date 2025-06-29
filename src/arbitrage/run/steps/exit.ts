@@ -69,7 +69,11 @@ export const runExitArbitrage = async ({
     contractSize: futureMarket.contractSize ?? 1
   })
 
-  exitArbitrage.executed *= 0.8;
+  if(!exitArbitrage.completed)
+    exitArbitrage.executed *= 0.8;
+
+  arbitrageNonce.spot = step.spot.result.nonce
+  arbitrageNonce.future = step.future.result.nonce
 
   if (!exitArbitrage.spotOrders.length ||
     !exitArbitrage.futureOrders.length)
