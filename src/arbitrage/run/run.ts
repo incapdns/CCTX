@@ -247,12 +247,12 @@ export const runArbitrage = async ({ symbol, exchange, quantity: amount, ...othe
 
   if (other.resume) {
     const parts = other.resume.split(',')
-    if (parts.length == 2) {
+    if (parts.length > 0) {
       const values = parts.map(Number)
       entry.quantity = values[0]
       entry.exited = 0
-      entry.remainingQuantity = entry.quantity
-      entry.profitPercent = values[1]
+      entry.remainingQuantity = 0
+      entry.profitPercent = values[1] ?? 0
     }
 
     directions.splice(0, 1)

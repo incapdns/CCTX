@@ -26,7 +26,7 @@ const server = http.createServer((req, res) => {
   const quantity = Number(url.searchParams.get('quantity'))
 
   if(!(quantity > 0) && !resume)
-    return res.end('Invalid amount')
+    return res.end('Invalid quantity')
 
   runArbitrage({
     symbol,
