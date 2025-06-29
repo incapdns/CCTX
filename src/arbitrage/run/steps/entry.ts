@@ -136,7 +136,7 @@ export const runEntryArbitrage = async ({
   if (exists)
     return
 
-  if (entry.temp.entry + executed > entry.quantity)
+  if (executed > entry.quantity - entry.temp.entry)
     return
 
   entry.temp.entry += executed
