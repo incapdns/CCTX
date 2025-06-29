@@ -112,7 +112,7 @@ const processAttempt = async (
       snapshot.spotOrder.info.original : false
 
   const quantity = redo ?
-    -(redo.remaining + redo.filled) :
+    0 :
     snapshot.spotOrder.filled + snapshot.spotOrder.remaining
 
   if (direction == ArbitrageDirection.Entry) {
