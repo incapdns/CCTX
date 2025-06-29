@@ -129,10 +129,10 @@ const redo = async (
   ])
 
   if(!spotOrder)
-    spotOrder = {} as Order
+    spotOrder = { remaining: 0 } as Order
 
   if(!futureOrder)
-    futureOrder = {} as Order
+    futureOrder = { remaining: 0 } as Order
 
   spotOrder.info = { 
     source: 'redo',
