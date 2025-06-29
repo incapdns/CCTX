@@ -106,45 +106,52 @@ const redo = async (
   manager: CcxtExchange,
   symbol: string
 ): Promise<OrderSnapshot> => {
-  let quantity = { spot: 0, future: 0 }
+  try {
+    let quantity = { spot: 0, future: 0 }
 
-  if(snapshot.spotOrder)
-    quantity.spot = snapshot.spotOrder.side == 'buy' ?
-      snapshot.spotOrder.filled :
-      snapshot.spotOrder.remaining
+    if(snapshot.spotOrder)
+      quantity.spot = snapshot.spotOrder.side == 'buy' ?
+        snapshot.spotOrder.filled :
+        snapshot.spotOrder.remaining
 
-  const contractSize = manager.market(`${symbol}:USDT`).contractSize ?? 1
+    const contractSize = manager.market(`${symbol}:USDT`).contractSize ?? 1
 
-  if(snapshot.futureOrder)
-    quantity.future = snapshot.futureOrder.side == 'sell' ?
-      snapshot.futureOrder.filled * contractSize :
-      snapshot.futureOrder.remaining * contractSize
+    if(snapshot.futureOrder)
+      quantity.future = snapshot.futureOrder.side == 'sell' ?
+        snapshot.futureOrder.filled * contractSize :
+        snapshot.futureOrder.remaining * contractSize
 
-  const redoSpot = prepareCreateOrder(manager, symbol, 'sell')
-  const redoFuture = prepareCreateOrder(manager, `${symbol}:USDT`, 'buy', true)
+    const redoSpot = prepareCreateOrder(manager, symbol, 'sell')
+    const redoFuture = prepareCreateOrder(manager, `${symbol}:USDT`, 'buy', true)
 
-  let [spotOrder, futureOrder] = await Promise.all([
-    quantity.spot > 0 ? redoSpot(undefined, quantity.spot) : snapshot.spotOrder,
-    quantity.future > 0 ? redoFuture(undefined, quantity.future) : snapshot.futureOrder
-  ])
+    let [spotOrder, futureOrder] = await Promise.all([
+      quantity.spot > 0 ? redoSpot(undefined, quantity.spot) : snapshot.spotOrder,
+      quantity.future > 0 ? redoFuture(undefined, quantity.future) : snapshot.futureOrder
+    ])
 
-  if(!spotOrder)
-    spotOrder = { remaining: 0 } as Order
+    if(!spotOrder)
+      spotOrder = { remaining: 0 } as Order
 
-  if(!futureOrder)
-    futureOrder = { remaining: 0 } as Order
+    if(!futureOrder)
+      futureOrder = { remaining: 0 } as Order
 
-  spotOrder.info = {
-    source: 'redo',
-    previous: snapshot.spotOrder?.info?.previous
+    spotOrder.info = {
+      source: 'redo',
+      previous: snapshot.spotOrder?.info?.previous
+    }
+
+    futureOrder.info = {
+      source: 'redo',
+      previous: snapshot.futureOrder?.info?.previous
+    }
+
+    return { spotOrder, futureOrder }
+  } catch(err){
+    return { 
+      spotOrder: { remaining: 0 } as Order, 
+      futureOrder: { remaining: 0 } as Order 
+    }
   }
-
-  futureOrder.info = {
-    source: 'redo',
-    previous: snapshot.futureOrder?.info?.previous
-  }
-
-  return { spotOrder, futureOrder }
 }
 
 export const tryCancel = async (
