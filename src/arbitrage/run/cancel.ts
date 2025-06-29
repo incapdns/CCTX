@@ -130,20 +130,26 @@ const redo = async (
     ])
 
     if(!spotOrder)
-      spotOrder = { remaining: 0 } as Order
+      spotOrder = { remaining: 0, filled: 0 } as Order
 
     if(!futureOrder)
-      futureOrder = { remaining: 0 } as Order
+      futureOrder = { remaining: 0, filled: 0 } as Order
 
     spotOrder.info = {
       source: 'redo',
       previous: snapshot.spotOrder?.info?.previous
     }
 
+    spotOrder.filled = spotOrder.filled ?? 0 + spotOrder.remaining ?? 0
+    spotOrder.remaining = 0
+
     futureOrder.info = {
       source: 'redo',
       previous: snapshot.futureOrder?.info?.previous
     }
+
+    futureOrder.filled = futureOrder.filled ?? 0 + futureOrder.remaining ?? 0
+    futureOrder.remaining = 0
 
     return { spotOrder, futureOrder }
   } catch(err){
