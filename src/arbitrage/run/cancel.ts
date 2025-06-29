@@ -148,8 +148,15 @@ const redo = async (
     return { spotOrder, futureOrder }
   } catch(err){
     return { 
-      spotOrder: { remaining: 0 } as Order, 
-      futureOrder: { remaining: 0 } as Order 
+      spotOrder: { 
+        remaining: 0,
+        info: { source: 'redo' }
+      } as Order,
+      
+      futureOrder: { 
+        remaining: 0,
+        info: { source: 'redo' }
+      } as Order, 
     }
   }
 }
