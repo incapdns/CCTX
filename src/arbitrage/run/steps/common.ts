@@ -1,8 +1,9 @@
-import { Market, Order } from "ccxt";
+import { Exchange as CcxtExchange, Market, Order } from "ccxt";
 import { Exchange } from "../../../exchange";
-import { ArbitrageOrder } from "../../compute/common";
+import { ArbitrageDirection, ArbitrageOrder, ArbitrageResult } from "../../compute/common";
 import { OrderCatch } from "../catch";
 import { cancelWithRetry, Step, syncOrder } from "../common";
+import { Entry } from "../run";
 
 export const rejectTimeout = <T>(ms: number): {
   promise: Promise<T>,
@@ -12,6 +13,9 @@ export const rejectTimeout = <T>(ms: number): {
   const promise = new Promise<T>((_, reject) => timeout = setTimeout(reject, ms))
   return { timeout, promise }
 }
+
+export const waitTimeout = (ms: number): Promise<void> => 
+  new Promise(resolve => setTimeout(resolve, ms))
 
 export interface Result {
   futureOrder: Order,
@@ -120,4 +124,164 @@ export const isVolatile = (
     target!.lastPrice = [lastPrice, now]
 
   return changed || timeDiff < 3000
+}
+
+export const computeCommonQuantity = (
+  exchange: CcxtExchange,
+  executed: number,
+  spotMarket: Market,
+  futureMarket: Market
+): number => {
+  try {
+    const contractSize = futureMarket.contractSize ?? 1
+
+    const spotMin =
+      spotMarket.limits?.amount?.min ??
+      spotMarket.precision?.amount ??
+      0
+
+    const futureMinContracts =
+      futureMarket.limits?.amount?.min ??
+      futureMarket.precision?.amount ??
+      1
+    const futureMin = futureMinContracts * contractSize
+
+    const spotInit = Number(
+      exchange.amountToPrecision(spotMarket.symbol, executed)
+    )
+    const futureInit =
+      Number(
+        exchange.amountToPrecision(
+          futureMarket.symbol,
+          executed / contractSize
+        )
+      ) * contractSize
+
+    let qty = Math.max(spotInit, futureInit, spotMin, futureMin)
+    let prev = -1
+    let iter = 0
+    const MAX_ITER = 10
+
+    while (qty !== prev && iter < MAX_ITER) {
+      prev = qty
+
+      const fut =
+        Number(
+          exchange.amountToPrecision(
+            futureMarket.symbol,
+            qty / contractSize
+          )
+        ) * contractSize
+
+      qty = Number(
+        exchange.amountToPrecision(
+          spotMarket.symbol,
+          fut
+        )
+      )
+
+      qty = Math.max(qty, spotMin, futureMin)
+
+      iter++
+    }
+
+    if (iter === MAX_ITER) {
+      console.warn(
+        '[computeCommonQuantity] atingiu máximo de iterações; ' +
+        'valor pode não ter convergido perfeitamente'
+      )
+    }
+
+    return qty
+  } catch (err) {
+    return -1
+  }
+}
+
+export type MaybeOrders = {
+  spotArbitrageOrder: ArbitrageOrder
+  futureArbitrageOrder: ArbitrageOrder,
+  executed: number
+} | null
+
+export const computeOrders = (
+  entry: Entry,
+  exchange: Exchange,
+  limit: number,
+  arbitrage:
+    | ArbitrageResult<ArbitrageDirection.Entry>
+    | ArbitrageResult<ArbitrageDirection.Exit>,
+  spotMarket: Market,
+  futureMarket: Market,
+  validOrder: (order: ArbitrageOrder, market: Market) => boolean
+): MaybeOrders => {
+  const manager = exchange.getManager()
+
+  const spotMinQty     = spotMarket.limits?.amount?.min ?? 0
+  const contractSize   = futureMarket.contractSize ?? 1
+  const futureMinQty   = (futureMarket.limits?.amount?.min ?? 0) * contractSize
+
+  const spotMinCost    = spotMarket.limits?.cost?.min ?? 0
+  const futureMinCost  = futureMarket.limits?.cost?.min ?? 0
+
+  const COST_BUFFER    = 1.02
+
+  let executed = Math.min(arbitrage.executed, limit)
+
+  for (let i = 0; i < 10; i++) {
+    executed = computeCommonQuantity(
+      manager,
+      executed,
+      spotMarket,
+      futureMarket
+    )
+    if (executed <= 0) return null
+
+    const nextRemaining = entry.remainingQuantity - executed
+
+    const diffQtySpot   = spotMinQty   - nextRemaining
+    const diffQtyFuture = futureMinQty - nextRemaining
+
+    const reqQtyByCostSpot = (spotMinCost * COST_BUFFER)  / arbitrage.maxPrice.spot
+    const reqQtyByCostFut  = (futureMinCost * COST_BUFFER) / arbitrage.maxPrice.future
+
+    const diffCostSpot   = reqQtyByCostSpot   - nextRemaining
+    const diffCostFuture = reqQtyByCostFut    - nextRemaining
+
+    if (nextRemaining > 0 && (
+      diffQtySpot   > 0 ||
+      diffQtyFuture > 0 ||
+      diffCostSpot  > 0 ||
+      diffCostFuture> 0
+    )) {
+      const maxGap = Math.max(
+        diffQtySpot,
+        diffQtyFuture,
+        diffCostSpot,
+        diffCostFuture
+      )
+      executed -= maxGap
+      continue
+    }
+
+    const spotOrder: ArbitrageOrder = {
+      price:    arbitrage.maxPrice.spot,
+      quantity: executed
+    }
+    if (!validOrder(spotOrder, spotMarket))  continue
+
+    const futureOrder: ArbitrageOrder = {
+      price:    arbitrage.maxPrice.future,
+      quantity: executed
+    }
+    if (!validOrder(futureOrder, futureMarket)) continue
+
+    return {
+      spotArbitrageOrder: spotOrder,
+      futureArbitrageOrder: futureOrder,
+      executed
+    }
+  }
+
+  return null
 }

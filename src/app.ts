@@ -23,15 +23,15 @@ const server = http.createServer((req, res) => {
     return res.end('Invalid symbol')
 
   const resume = url.searchParams.get('resume')
-  const amount = Number(url.searchParams.get('amount'))
+  const quantity = Number(url.searchParams.get('quantity'))
 
-  if(!(amount > 0) && !resume)
-    return res.end('Invalid amount')
+  if(!(quantity > 0) && !resume)
+    return res.end('Invalid quantity')
 
   runArbitrage({
     symbol,
     exchange: getExchange(0, 'mexc'),
-    amount,
+    quantity,
     timeout: 10000,
     resume
   })

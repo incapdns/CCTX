@@ -1,7 +1,7 @@
 import Decimal from 'decimal.js';
 import { ArbitrageDirection, ArbitrageOrder, ArbitrageRequest, ArbitrageResult, cleanResidual, findMaxPrice } from './common';
 
-const isOutsideTolerance = (base: Decimal.Value, target: Decimal.Value, percent: Decimal.Value): boolean => {
+export const isOutsideTolerance = (base: Decimal.Value, target: Decimal.Value, percent: Decimal.Value): boolean => {
   const baseDecimal = Decimal(base);
   const targetDecimal = Decimal(target);
   const percentDecimal = Decimal(percent);
@@ -17,8 +17,9 @@ export const doEntryArbitrage = ({
   spotBook,
   futureBook,
   amount,
-  marginAmountPercent,
-  percent
+  marginQuantityPercent,
+  percent,
+  contractSize
 }: ArbitrageRequest<ArbitrageDirection.Entry>): ArbitrageResult<ArbitrageDirection.Entry> => {
   const spotOrders = spotBook.map(([price, qty]) => [Decimal(price), Decimal(qty)])
   const futureOrders = futureBook.map(([price, qty]) => [Decimal(price), Decimal(qty)])
@@ -45,7 +46,7 @@ export const doEntryArbitrage = ({
     const spotPrice = spotOrders[i][0]
     const spotVolume = spotOrders[i][1]
     const futurePrice = futureOrders[j][0]
-    const futureVolume = futureOrders[j][1]
+    const futureVolume = futureOrders[j][1].mul(contractSize)
 
     const diff = futurePrice
       .minus(spotPrice)
@@ -62,7 +63,7 @@ export const doEntryArbitrage = ({
 
     const value = spotPrice.mul(currentQty)
     totalSpot = totalSpot.plus(value)
-    available = available.minus(value)
+    available = available.minus(currentQty)
 
     const spotOrder = spotOrderResults[spotOrderResults.length - 1]
 
@@ -110,8 +111,8 @@ export const doEntryArbitrage = ({
     qty = qty.plus(currentQty)
 
     completed =
-      !isOutsideTolerance(amount, totalSpot, marginAmountPercent) &&
-      !isOutsideTolerance(amount, totalFuture, marginAmountPercent)
+      !isOutsideTolerance(amount, totalSpot, marginQuantityPercent) &&
+      !isOutsideTolerance(amount, totalFuture, marginQuantityPercent)
   }
 
   const profit = totalFuture.minus(totalSpot)
@@ -142,8 +143,8 @@ export const doEntryArbitrage = ({
     futureOrders: futuresOrderResults,
     profitPercent: profitPercent.toNumber(),
     maxPrice: {
-      spot: maxPrice.increasing,
-      future: maxPrice.decreasing
+      spot: maxPrice?.increasing,
+      future: maxPrice?.decreasing
     }
   }
 }

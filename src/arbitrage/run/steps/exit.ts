@@ -1,12 +1,13 @@
-import { Order } from "ccxt";
+import { Order } from 'ccxt';
 import { Exchange } from "../../../exchange";
 import { doArbitrage } from '../../compute';
-import { ArbitrageDirection, ArbitrageOrder } from "../../compute/common";
+import { ArbitrageDirection } from "../../compute/common";
+import { isOutsideTolerance } from '../../compute/entry';
 import { CancelOrderError } from '../cancel';
-import { CatchReturn, OrderCatch } from "../catch";
-import { createOrderValidator, ArbitrageNonce, prepareCreateOrder, Step, syncOrder } from '../common';
+import { CatchReturn, OrderCatch } from '../catch';
+import { ArbitrageNonce, createOrderValidator, prepareCreateOrder, Step, syncOrder } from '../common';
 import { Entry } from '../run';
-import { isVolatile, rejectTimeout, Result, retryOrder, VolatileDirection } from "./common";
+import { computeOrders, isVolatile, rejectTimeout, Result, retryOrder, VolatileDirection, waitTimeout } from './common';
 
 interface ExitArbitrage {
   exchange: Exchange,
@@ -19,6 +20,8 @@ interface ExitArbitrage {
   timeout: number
 }
 
+const percent = 0
+
 export const runExitArbitrage = async ({
   exchange,
   symbol,
@@ -29,14 +32,17 @@ export const runExitArbitrage = async ({
   futureOrdersCatch,
   timeout
 }: ExitArbitrage) => {
-  if (step.executed) return
+  if (step.executed)
+    return
 
-  if (!step.future?.result || !step.spot?.result) return
+  if (!step.future?.result || !step.spot?.result)
+    return
 
   const sameSpot = arbitrageNonce.spot == step.spot?.result?.nonce
   const sameFuture = arbitrageNonce.future == step.future?.result?.nonce
 
-  if (sameFuture && sameSpot) return
+  if (sameFuture && sameSpot)
+    return
 
   const manager = exchange.getManager()
 
@@ -53,173 +59,216 @@ export const runExitArbitrage = async ({
   const spotMarket = manager.market(symbol)
   const futureMarket = manager.market(`${symbol}:USDT`)
 
-  const percent = 0
+  const quantityExecuted = entry.quantity - entry.remainingQuantity
 
   const exitArbitrage = doArbitrage({
     direction: ArbitrageDirection.Exit,
     spotBook: spotBook.bids,
     futureBook: futureBook.asks,
+    executed: quantityExecuted,
     percent,
-    executed: entry.executed
+    contractSize: futureMarket.contractSize ?? 1
   })
+
+  if(!exitArbitrage.completed)
+    exitArbitrage.executed *= 0.8;
 
   arbitrageNonce.spot = step.spot.result.nonce
   arbitrageNonce.future = step.future.result.nonce
 
-  if (!exitArbitrage.completed) return
-
-  const validSpot = 
-    exitArbitrage.spotOrders[0].price != exitArbitrage.maxPrice.spot ||
-    !isVolatile(step, VolatileDirection.Spot, exitArbitrage.maxPrice.spot)
-
-  const validFuture = 
-    exitArbitrage.futureOrders[0].price != exitArbitrage.maxPrice.future ||
-    !isVolatile(step, VolatileDirection.Future, exitArbitrage.maxPrice.future)
-
-  if(!validFuture || !validSpot)
+  if (!exitArbitrage.spotOrders.length ||
+    !exitArbitrage.futureOrders.length)
     return
 
-  if (!step.executed &&
-    step.direction == ArbitrageDirection.Exit) {
-    step.executed = true
+  const isSpotVolatile = isVolatile(step, VolatileDirection.Spot, exitArbitrage.maxPrice.spot)
+  let validSpot =
+    exitArbitrage.spotOrders[0].price != exitArbitrage.maxPrice.spot ||
+    !isSpotVolatile
 
-    const spotArbitrageOrder: ArbitrageOrder = {
-      price: exitArbitrage.maxPrice.spot,
-      quantity: entry.executed
-    }
+  const isFutureVolatile = isVolatile(step, VolatileDirection.Future, exitArbitrage.maxPrice.future)
+  let validFuture =
+    exitArbitrage.futureOrders[0].price != exitArbitrage.maxPrice.future ||
+    !isFutureVolatile
 
-    if (!validOrder(spotArbitrageOrder, spotMarket))
-      throw new Error("Invalid spot order")
+  if (!validFuture || !validSpot) {
+    await waitTimeout(3000)
 
-    const futureArbitrageOrder: ArbitrageOrder = {
-      price: exitArbitrage.maxPrice.future,
-      quantity: entry.executed
-    }
+    validSpot = isVolatile(step, VolatileDirection.Spot, exitArbitrage.maxPrice.spot)
+    validFuture = isVolatile(step, VolatileDirection.Future, exitArbitrage.maxPrice.future)
 
-    if (!validOrder(futureArbitrageOrder, futureMarket))
-      throw new Error("Invalid future order")
+    if(validSpot)
+      step.spot!.lastPrice[1] = Date.now()
 
-    const [spotOrder, futureOrder] = await Promise.allSettled([
-      createSellSpotOrder(spotArbitrageOrder),
-      createBuyFutureOrder(futureArbitrageOrder)
-    ])
+    if(validFuture)
+      step.future!.lastPrice[1] = Date.now()
+  }
 
-    const hasError =
-      spotOrder.status === 'rejected' ||
-      futureOrder.status === 'rejected'
+  if (!validFuture || !validSpot)
+    return
 
-    if (hasError)
-      throw new CancelOrderError(
-        spotOrder.status == 'fulfilled' ? spotOrder.value : null,
-        futureOrder.status == 'fulfilled' ? futureOrder.value : null
-      )
+  if (step.executed)
+    return
 
-    let finished = false,
-      spotDone = false,
-      futureDone = false;
+  delete step.future.result
+  delete step.spot.result
 
-    const time = rejectTimeout<[CatchReturn, CatchReturn]>(timeout)
+  const remainingQuantityForExit = entry.quantity - entry.exited
 
-    const result: Result = {
-      futureOrder: futureOrder.value,
-      spotOrder: spotOrder.value
-    }
+  const { spotArbitrageOrder, futureArbitrageOrder, executed } = computeOrders(
+    entry,
+    exchange,
+    remainingQuantityForExit,
+    exitArbitrage,
+    spotMarket,
+    futureMarket,
+    validOrder
+  ) ?? {}
 
-    result.spotOrder.side = 'sell'
-    result.spotOrder.symbol = symbol
+  if(!spotArbitrageOrder || !futureArbitrageOrder)
+    return
 
-    result.futureOrder.side = 'buy'
-    result.futureOrder.symbol = `${symbol}:USDT`
+  const exists = step
+    .orders
+    .slice(-10)
+    .find(order =>
+      !isOutsideTolerance(order[0], spotArbitrageOrder.price, 25) &&
+      order[1] == spotArbitrageOrder.quantity &&
+      !isOutsideTolerance(order[2], futureArbitrageOrder.price, 25) &&
+      order[3] == futureArbitrageOrder.quantity &&
+      order[4] >= Date.now() - 5000
+    )
 
-    const clearAndWait = async () => {
-      clearTimeout(time.timeout)
-      clearTimeout(result.nextSpot?.timeout)
-      clearTimeout(result.nextFuture?.timeout)
+  if (exists)
+    return
+    
+  step.orders.push([
+    spotArbitrageOrder.price,
+    spotArbitrageOrder.quantity,
+    futureArbitrageOrder.price,
+    futureArbitrageOrder.quantity,
+    Date.now()
+  ])
 
-      if (result.nextSpot?.entered)
-        await result.nextSpot?.promise
+  const [spotOrder, futureOrder] = await Promise.allSettled([
+    createSellSpotOrder(spotArbitrageOrder),
+    createBuyFutureOrder(futureArbitrageOrder)
+  ])
 
-      if (result.nextFuture?.entered)
-        await result.nextFuture?.promise
-    }
+  const hasError =
+    spotOrder.status === 'rejected' ||
+    futureOrder.status === 'rejected'
 
-    let lastNonces = { spot: -1, future: -1 }
+  if (hasError)
+    throw new CancelOrderError(
+      spotOrder.status == 'fulfilled' ? spotOrder.value : null,
+      futureOrder.status == 'fulfilled' ? futureOrder.value : null
+    )
 
-    while (!finished) {
-      try {
-        const done = (order: Order) =>
-          order.remaining == 0
+  let finished = false,
+    spotDone = false,
+    futureDone = false;
 
-        const [spot, future] = await Promise.race([
-          time.promise,
-          Promise.all([
-            !spotDone ? spotOrdersCatch.next(lastNonces.spot + 1) : [],
-            !futureDone ? futureOrdersCatch.next(lastNonces.future + 1) : []
-          ]),
-        ]) as [CatchReturn, CatchReturn]
+  const time = rejectTimeout<[CatchReturn, CatchReturn]>(timeout)
 
-        if (spot.nonce != undefined)
-          lastNonces.spot = spot.nonce
+  const result: Result = {
+    futureOrder: futureOrder.value,
+    spotOrder: spotOrder.value
+  }
 
-        if (future.nonce != undefined)
-          lastNonces.future = future.nonce
+  result.spotOrder.side = 'sell'
+  result.spotOrder.symbol = symbol
 
-        syncOrder([result.spotOrder], spot)
-        syncOrder([result.futureOrder], future)
+  result.futureOrder.side = 'buy'
+  result.futureOrder.symbol = `${symbol}:USDT`
 
-        spotDone = done(result.spotOrder)
-        futureDone = done(result.futureOrder)
+  const clearAndWait = async () => {
+    clearTimeout(time.timeout)
+    clearTimeout(result.nextSpot?.timeout)
+    clearTimeout(result.nextFuture?.timeout)
 
-        if (spotDone &&
-          !futureDone &&
-          !result.nextFuture) {
-          const newFuturePrice = result.spotOrder.average! / (1 + percent / 100)
+    if (result.nextSpot?.entered)
+      await result.nextSpot?.promise
 
-          retryOrder(
-            'futureOrder',
-            exchange,
-            result,
-            futureOrdersCatch,
-            newFuturePrice,
-            futureMarket,
-            validOrder,
-            createBuyFutureOrder
-          )
-        }
+    if (result.nextFuture?.entered)
+      await result.nextFuture?.promise
+  }
 
-        if (!spotDone &&
-          futureDone &&
-          !result.nextSpot) {
-          const newSpotPrice = result.futureOrder.average! * (1 + percent / 100)
+  const lastNonces = { spot: -1, future: -1 }
 
-          retryOrder(
-            'spotOrder',
-            exchange,
-            result,
-            spotOrdersCatch,
-            newSpotPrice,
-            spotMarket,
-            validOrder,
-            createSellSpotOrder
-          )
-        }
+  while (!finished) {
+    try {
+      const done = (order: Order) =>
+        order.remaining == 0
 
-        finished = spotDone && futureDone
-      } catch (err) {
-        await clearAndWait()
+      const [spot, future] = await Promise.race([
+        time.promise,
+        Promise.all([
+          !spotDone ? spotOrdersCatch.next(lastNonces.spot + 1) : [],
+          !futureDone ? futureOrdersCatch.next(lastNonces.future + 1) : []
+        ])
+      ]) as [CatchReturn, CatchReturn]
 
-        throw new CancelOrderError(
-          result.spotOrder,
-          result.futureOrder
+      if (spot.nonce != undefined)
+        lastNonces.spot = spot.nonce
+
+      if (future.nonce != undefined)
+        lastNonces.future = future.nonce
+
+      syncOrder([result.spotOrder], spot)
+      syncOrder([result.futureOrder], future)
+
+      spotDone = done(result.spotOrder)
+      futureDone = done(result.futureOrder)
+
+      if (spotDone &&
+        !futureDone &&
+        !result.nextFuture) {
+        const newFuturePrice = result.spotOrder.average! / (1 + percent / 100)
+
+        retryOrder(
+          'futureOrder',
+          exchange,
+          result,
+          futureOrdersCatch,
+          newFuturePrice,
+          futureMarket,
+          validOrder,
+          createBuyFutureOrder
         )
       }
+
+      if (!spotDone &&
+        futureDone &&
+        !result.nextSpot) {
+        const newSpotPrice = result.futureOrder.average! * (1 + percent / 100)
+
+        retryOrder(
+          'spotOrder',
+          exchange,
+          result,
+          spotOrdersCatch,
+          newSpotPrice,
+          spotMarket,
+          validOrder,
+          createSellSpotOrder
+        )
+      }
+
+      finished = spotDone && futureDone
+    } catch (err) {
+      await clearAndWait()
+
+      throw new CancelOrderError(
+        result.spotOrder,
+        result.futureOrder
+      )
     }
+  }
 
-    await clearAndWait()
+  await clearAndWait()
 
-    step.resolve({
-      spotOrder: result.spotOrder,
-      futureOrder: result.futureOrder
-    })
+  return {
+    spotOrder: result.spotOrder,
+    futureOrder: result.futureOrder,
   }
 }

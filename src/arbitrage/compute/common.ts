@@ -17,12 +17,12 @@ export interface CommonResult {
     spot: number;
     future: number;
   }
+  executed: number;
   completed: boolean;
 }
 
 export type ArbitrageResults = {
   [ArbitrageDirection.Entry]: CommonResult & {
-    executed: number;
     profitPercent: number
   }
   [ArbitrageDirection.Exit]: CommonResult;
@@ -37,12 +37,13 @@ export interface CommonRequest {
   spotBook: [number, number][]
   futureBook: [number, number][]
   percent: number
+  contractSize: number
 }
 
 export type ArbitrageRequests = {
   [ArbitrageDirection.Entry]: CommonRequest & {
     amount: number,
-    marginAmountPercent: number
+    marginQuantityPercent: number
   },
   [ArbitrageDirection.Exit]: CommonRequest & {
     executed: number
@@ -67,22 +68,25 @@ export const findMaxPrice = (
 
   let i = 0;
   while (i < increasing.length && j >= 0) {
-    const spotPrice = increasing[i][0];
-    const requiredFuture = spotPrice * (1 + percentage / 100);
+    const increasingPrice = increasing[i][0];
+    const required = increasingPrice * (1 + percentage / 100);
 
-    while (j >= 0 && decreasing[j][0] < requiredFuture) {
+    while (j >= 0 && decreasing[j][0] < required) {
       j--;
     }
 
     if (j < 0) break;
 
-    const futurePrice = decreasing[j][0];
-    const diffPercentage = ((futurePrice - spotPrice) / spotPrice) * 100;
+    const decreasingPrice = decreasing[j][0];
+    const diffPercentage = ((decreasingPrice - increasingPrice) / increasingPrice) * 100;
     const excess = diffPercentage - percentage;
 
     if (excess < minExcess) {
       minExcess = excess;
-      best = { increasing: spotPrice, decreasing: futurePrice };
+      best = {
+        increasing: increasingPrice, 
+        decreasing: decreasingPrice
+      }
     }
     i++;
   }
