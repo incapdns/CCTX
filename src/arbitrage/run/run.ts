@@ -134,6 +134,9 @@ const processAttempt = async (
     step.executed = entry.exited == entry.quantity
     entry.temp.exit = entry.exited
   }
+
+  if(step.executed)
+    console.warn(`Step ${direction} executed for ${snapshot.spotOrder.symbol} with quantity ${entry.quantity}`)
 }
 
 const runStep = async ({
