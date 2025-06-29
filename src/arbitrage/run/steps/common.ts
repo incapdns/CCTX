@@ -129,66 +129,70 @@ export const computeCommonQuantity = (
   spotMarket: Market,
   futureMarket: Market
 ): number => {
-  const contractSize = futureMarket.contractSize ?? 1
+  try {
+    const contractSize = futureMarket.contractSize ?? 1
 
-  const spotMin =
-    spotMarket.limits?.amount?.min ??
-    spotMarket.precision?.amount ??
-    0
+    const spotMin =
+      spotMarket.limits?.amount?.min ??
+      spotMarket.precision?.amount ??
+      0
 
-  const futureMinContracts =
-    futureMarket.limits?.amount?.min ??
-    futureMarket.precision?.amount ??
-    1
-  const futureMin = futureMinContracts * contractSize
+    const futureMinContracts =
+      futureMarket.limits?.amount?.min ??
+      futureMarket.precision?.amount ??
+      1
+    const futureMin = futureMinContracts * contractSize
 
-  const spotInit = Number(
-    exchange.amountToPrecision(spotMarket.symbol, executed)
-  )
-  const futureInit =
-    Number(
-      exchange.amountToPrecision(
-        futureMarket.symbol,
-        executed / contractSize
-      )
-    ) * contractSize
-
-  let qty = Math.max(spotInit, futureInit, spotMin, futureMin)
-  let prev = -1
-  let iter = 0
-  const MAX_ITER = 10
-
-  while (qty !== prev && iter < MAX_ITER) {
-    prev = qty
-
-    const fut =
+    const spotInit = Number(
+      exchange.amountToPrecision(spotMarket.symbol, executed)
+    )
+    const futureInit =
       Number(
         exchange.amountToPrecision(
           futureMarket.symbol,
-          qty / contractSize
+          executed / contractSize
         )
       ) * contractSize
 
-    qty = Number(
-      exchange.amountToPrecision(
-        spotMarket.symbol,
-        fut
+    let qty = Math.max(spotInit, futureInit, spotMin, futureMin)
+    let prev = -1
+    let iter = 0
+    const MAX_ITER = 10
+
+    while (qty !== prev && iter < MAX_ITER) {
+      prev = qty
+
+      const fut =
+        Number(
+          exchange.amountToPrecision(
+            futureMarket.symbol,
+            qty / contractSize
+          )
+        ) * contractSize
+
+      qty = Number(
+        exchange.amountToPrecision(
+          spotMarket.symbol,
+          fut
+        )
       )
-    )
 
-    qty = Math.max(qty, spotMin, futureMin)
+      qty = Math.max(qty, spotMin, futureMin)
 
-    iter++
+      iter++
+    }
+
+    if (iter === MAX_ITER) {
+      console.warn(
+        '[computeCommonQuantity] atingiu máximo de iterações; ' +
+        'valor pode não ter convergido perfeitamente'
+      )
+    }
+
+    return qty
+  } catch (err) {
+    return -1
   }
-
-  if (iter === MAX_ITER) {
-    console.warn(
-      '[computeCommonQuantity] atingiu máximo de iterações; ' +
-      'valor pode não ter convergido perfeitamente'
-    )
-  }
-
-  return qty
 }
 
 export type MaybeOrders = {
