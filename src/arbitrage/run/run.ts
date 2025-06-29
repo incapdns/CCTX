@@ -24,6 +24,10 @@ export interface Entry {
   remainingQuantity: number,
   /** Total quantity that was exited */
   exited: number,
+  temp: {
+    entry: number,
+    exit: number
+  }
 }
 
 const catchCancelOrder = async (
@@ -119,16 +123,16 @@ const processAttempt = async (
     entry.remainingQuantity -= quantity
 
     const quantityExecuted = entry.quantity - entry.remainingQuantity
-
     step.executed = !isOutsideTolerance(
       entry.quantity,
       quantityExecuted,
       10
     )
+    entry.temp.entry = entry.quantity - entry.remainingQuantity
   } else {
     entry.exited += quantity
-
     step.executed = entry.exited == entry.quantity
+    entry.temp.exit = entry.exited
   }
 }
 
@@ -227,7 +231,11 @@ export const runArbitrage = async ({ symbol, exchange, quantity: amount, ...othe
     profitPercent: 0,
     exited: 0,
     quantity: amount,
-    remainingQuantity: amount
+    remainingQuantity: amount,
+    temp: {
+      entry: 0,
+      exit: 0
+    }
   }
 
   if (exchange.running.includes(symbol))
