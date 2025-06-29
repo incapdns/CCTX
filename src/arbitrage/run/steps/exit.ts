@@ -138,7 +138,12 @@ export const runExitArbitrage = async ({
 
   if (exists)
     return
-    
+
+  if(entry.temp.exit + executed > entry.quantity)
+    return
+
+  entry.temp.exit += executed
+  
   step.orders.push([
     spotArbitrageOrder.price,
     spotArbitrageOrder.quantity,
@@ -146,11 +151,6 @@ export const runExitArbitrage = async ({
     futureArbitrageOrder.quantity,
     Date.now()
   ])
-
-  if(entry.temp.exit + executed > entry.quantity)
-    return
-
-  entry.temp.exit += executed
 
   const [spotOrder, futureOrder] = await Promise.allSettled([
     createSellSpotOrder(spotArbitrageOrder),
