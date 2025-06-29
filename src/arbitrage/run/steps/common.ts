@@ -14,6 +14,9 @@ export const rejectTimeout = <T>(ms: number): {
   return { timeout, promise }
 }
 
+export const waitTimeout = (ms: number): Promise<void> => 
+  new Promise(resolve => setTimeout(resolve, ms))
+
 export interface Result {
   futureOrder: Order,
   nextFuture?: {

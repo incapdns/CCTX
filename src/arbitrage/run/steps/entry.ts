@@ -7,7 +7,7 @@ import { CancelOrderError } from '../cancel';
 import { CatchReturn, OrderCatch } from '../catch';
 import { ArbitrageNonce, createOrderValidator, prepareCreateOrder, Step, syncOrder } from '../common';
 import { Entry } from '../run';
-import { computeOrders, isVolatile, rejectTimeout, Result, retryOrder, VolatileDirection } from './common';
+import { computeOrders, isVolatile, rejectTimeout, Result, retryOrder, VolatileDirection, waitTimeout } from './common';
 
 interface EntryArbitrage {
   exchange: Exchange,
@@ -65,7 +65,8 @@ export const runEntryArbitrage = async ({
     futureBook: futureBook.bids,
     percent,
     amount: entry.quantity,
-    marginQuantityPercent: 10
+    marginQuantityPercent: 10,
+    contractSize: futureMarket.contractSize ?? 1
   })
 
   entryArbitrage.executed *= 0.8;
@@ -77,13 +78,28 @@ export const runEntryArbitrage = async ({
     !entryArbitrage.futureOrders.length)
     return
 
+  const isSpotVolatile = isVolatile(step, VolatileDirection.Spot, entryArbitrage.maxPrice.spot)
   let validSpot =
     entryArbitrage.spotOrders[0].price != entryArbitrage.maxPrice.spot ||
-    !isVolatile(step, VolatileDirection.Spot, entryArbitrage.maxPrice.spot)
+    !isSpotVolatile
 
+  const isFutureVolatile = isVolatile(step, VolatileDirection.Future, entryArbitrage.maxPrice.future)
   let validFuture =
     entryArbitrage.futureOrders[0].price != entryArbitrage.maxPrice.future ||
-    !isVolatile(step, VolatileDirection.Future, entryArbitrage.maxPrice.future)
+    !isFutureVolatile
+
+  if (!validFuture || !validSpot) {
+    await waitTimeout(3000)
+
+    validSpot = isVolatile(step, VolatileDirection.Spot, entryArbitrage.maxPrice.spot)
+    validFuture = isVolatile(step, VolatileDirection.Future, entryArbitrage.maxPrice.future)
+
+    if(validSpot)
+      step.spot!.lastPrice[1] = Date.now()
+
+    if(validFuture)
+      step.future!.lastPrice[1] = Date.now()
+  }
 
   if (!validFuture || !validSpot)
     return

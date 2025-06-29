@@ -1,4 +1,4 @@
-import { Order } from "ccxt";
+import { Order, OrderBook } from "ccxt";
 import { Exchange } from "../../exchange";
 import { ArbitrageDirection } from "../compute/common";
 import { CancelOrderError, tryCancel } from './cancel';
@@ -6,6 +6,7 @@ import { catchOrders, CatchReturn, OrderCatch } from './catch';
 import { ArbitrageNonce, OrderSnapshot, StepManager, syncOrder } from './common';
 import { runEntryArbitrage } from './steps/entry';
 import { runExitArbitrage } from './steps/exit';
+import { snapshot } from "node:test";
 
 export interface Arbitrage {
   symbol: string,
@@ -122,69 +123,59 @@ const runStep = async ({
     stepManager.entry :
     stepManager.exit
 
-  while (exchange.running.includes(symbol) && !step.executed) {
-    const attempts: Array<Promise<{
-      spotOrder: Order;
-      futureOrder: Order;
-    }>> = []
+  const eachAttempt = (attempt: OrderSnapshot) =>
+    processAttempt(attempt, spotOrdersCatch, futureOrdersCatch)
 
-    attempts.push(
+  const eachPromise = async (p: Promise<OrderBook>): Promise<OrderSnapshot> => {
+    try {
+      await p
+
+      return stepFn({
+        exchange,
+        symbol,
+        entry,
+        step,
+        arbitrageNonce,
+        timeout,
+        spotOrdersCatch,
+        futureOrdersCatch
+      })
+        .catch(e =>
+          catchCancelOrder(e, exchange, symbol, spotOrdersCatch, futureOrdersCatch)
+        )
+    } catch (e) { }
+  }
+
+  while (exchange.running.includes(symbol) && !step.executed) {
+    const promises: Array<Promise<OrderBook>> = []
+
+    promises.push(
       exchange
         .getManager()
         .watchOrderBook(symbol, 10)
         .then(result => (
-          step.spot.result = result,
-          stepFn({
-            exchange,
-            symbol,
-            entry,
-            step,
-            arbitrageNonce,
-            timeout,
-            spotOrdersCatch,
-            futureOrdersCatch
-          })
+          step.spot.result = result
         ))
-        .catch(err =>
-          catchCancelOrder(err, exchange, symbol, spotOrdersCatch, futureOrdersCatch)
-        )
     )
 
-    attempts.push(
+    promises.push(
       exchange
         .getManager()
         .watchOrderBook(futureSymbol, 10)
         .then(result => (
-          step.future.result = result,
-          stepFn({
-            exchange,
-            symbol,
-            entry,
-            step,
-            arbitrageNonce,
-            spotOrdersCatch,
-            futureOrdersCatch,
-            timeout
-          })
+          step.future.result = result
         ))
-        .catch(err =>
-          catchCancelOrder(err, exchange, futureSymbol, spotOrdersCatch, futureOrdersCatch)
-        )
     )
 
-    const [first, second] = await Promise.all(attempts)
+    const attempts =
+      promises
+        .map(eachPromise)
 
-    processAttempt(
-      first,
-      spotOrdersCatch,
-      futureOrdersCatch
-    )
+    Promise
+      .all(attempts)
+      .then(attempts => attempts.map(eachAttempt))
 
-    processAttempt(
-      second,
-      spotOrdersCatch,
-      futureOrdersCatch
-    )
+    await Promise.allSettled(promises)
   }
 }
 

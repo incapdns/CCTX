@@ -37,6 +37,7 @@ export interface CommonRequest {
   spotBook: [number, number][]
   futureBook: [number, number][]
   percent: number
+  contractSize: number
 }
 
 export type ArbitrageRequests = {

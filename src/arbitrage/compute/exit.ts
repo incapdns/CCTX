@@ -1,7 +1,13 @@
 import Decimal from 'decimal.js';
 import { ArbitrageDirection, ArbitrageOrder, ArbitrageRequest, ArbitrageResult, cleanResidual, findMaxPrice } from './common';
 
-export const doExitArbitrage = ({ spotBook, futureBook, executed, percent }: ArbitrageRequest<ArbitrageDirection.Exit>): ArbitrageResult<ArbitrageDirection.Exit> => {
+export const doExitArbitrage = ({ 
+  spotBook, 
+  futureBook, 
+  executed, 
+  percent,
+  contractSize
+}: ArbitrageRequest<ArbitrageDirection.Exit>): ArbitrageResult<ArbitrageDirection.Exit> => {
   const spotOrders = spotBook.map(([price, qty]) => [Decimal(price), Decimal(qty)])
   const futureOrders = futureBook.map(([price, qty]) => [Decimal(price), Decimal(qty)])
 
@@ -20,7 +26,7 @@ export const doExitArbitrage = ({ spotBook, futureBook, executed, percent }: Arb
     const spotPrice = spotOrders[i][0]
     const spotVolume = spotOrders[i][1]
     const futurePrice = futureOrders[j][0]
-    const futureVolume = futureOrders[j][1]
+    const futureVolume = futureOrders[j][1].mul(contractSize)
 
     const diff = spotPrice
       .minus(futurePrice)

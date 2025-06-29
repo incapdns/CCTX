@@ -18,7 +18,8 @@ export const doEntryArbitrage = ({
   futureBook,
   amount,
   marginQuantityPercent,
-  percent
+  percent,
+  contractSize
 }: ArbitrageRequest<ArbitrageDirection.Entry>): ArbitrageResult<ArbitrageDirection.Entry> => {
   const spotOrders = spotBook.map(([price, qty]) => [Decimal(price), Decimal(qty)])
   const futureOrders = futureBook.map(([price, qty]) => [Decimal(price), Decimal(qty)])
@@ -45,7 +46,7 @@ export const doEntryArbitrage = ({
     const spotPrice = spotOrders[i][0]
     const spotVolume = spotOrders[i][1]
     const futurePrice = futureOrders[j][0]
-    const futureVolume = futureOrders[j][1]
+    const futureVolume = futureOrders[j][1].mul(contractSize)
 
     const diff = futurePrice
       .minus(spotPrice)
