@@ -59,13 +59,11 @@ export const runExitArbitrage = async ({
   const spotMarket = manager.market(symbol)
   const futureMarket = manager.market(`${symbol}:USDT`)
 
-  const quantityExecuted = entry.quantity - entry.remainingQuantity
-
   const exitArbitrage = doArbitrage({
     direction: ArbitrageDirection.Exit,
     spotBook: spotBook.bids,
     futureBook: futureBook.asks,
-    executed: quantityExecuted,
+    executed: entry.quantity - entry.exited,
     percent,
     contractSize: futureMarket.contractSize ?? 1
   })
@@ -139,10 +137,10 @@ export const runExitArbitrage = async ({
   if (exists)
     return
 
-  if(entry.temp.exit + executed > entry.quantity)
+  if (executed > entry.quantity - entry.temp.entry)
     return
 
-  entry.temp.exit += executed
+  entry.temp.entry += executed
   
   step.orders.push([
     spotArbitrageOrder.price,
