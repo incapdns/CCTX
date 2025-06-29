@@ -141,7 +141,7 @@ const redo = async (
 
   futureOrder.info = {
     source: 'redo',
-    original: snapshot.futureOrder?.info?.previous
+    previous: snapshot.futureOrder?.info?.previous
   }
 
   return { spotOrder, futureOrder }

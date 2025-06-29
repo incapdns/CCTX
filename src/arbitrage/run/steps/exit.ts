@@ -136,10 +136,10 @@ export const runExitArbitrage = async ({
   if (exists)
     return
 
-  if (executed > entry.quantity - entry.temp.entry)
+  if (executed > entry.quantity - entry.temp.exit)
     return
 
-  entry.temp.entry += executed
+  entry.temp.exit += executed
   
   step.orders.push([
     spotArbitrageOrder.price,
