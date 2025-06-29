@@ -124,8 +124,6 @@ export const runExitArbitrage = async ({
 
   entry.exited += executed;
 
-  step.executed = entry.exited == entry.quantity
-
   const [spotOrder, futureOrder] = await Promise.allSettled([
     createSellSpotOrder(spotArbitrageOrder),
     createBuyFutureOrder(futureArbitrageOrder)

@@ -125,16 +125,6 @@ export const runEntryArbitrage = async ({
 
   entry.remainingQuantity -= executed;
 
-  const quantityExecuted = entry.quantity - entry.remainingQuantity
-
-  if (!isOutsideTolerance(
-    entry.quantity,
-    quantityExecuted,
-    10
-  )) {
-    step.executed = true
-  }
-
   const [spotOrder, futureOrder] = await Promise.allSettled([
     createBuySpotOrder(spotArbitrageOrder),
     createSellFutureOrder(futureArbitrageOrder)

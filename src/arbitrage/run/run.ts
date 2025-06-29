@@ -3,10 +3,10 @@ import { Exchange } from "../../exchange";
 import { ArbitrageDirection } from "../compute/common";
 import { CancelOrderError, tryCancel } from './cancel';
 import { catchOrders, CatchReturn, OrderCatch } from './catch';
-import { ArbitrageNonce, OrderSnapshot, StepManager, syncOrder } from './common';
+import { ArbitrageNonce, OrderSnapshot, Step, StepManager, syncOrder } from './common';
 import { runEntryArbitrage } from './steps/entry';
 import { runExitArbitrage } from './steps/exit';
-import { snapshot } from "node:test";
+import { isOutsideTolerance } from "../compute/entry";
 
 export interface Arbitrage {
   symbol: string,
@@ -66,11 +66,17 @@ interface RunStep {
 
 const processAttempt = async (
   snapshot: OrderSnapshot,
+  entry: Entry,
+  step: Step,
+  direction: ArbitrageDirection,
   spotOrdersCatch: OrderCatch,
   futureOrdersCatch: OrderCatch,
 ) => {
   if (!snapshot || !snapshot.spotOrder || !snapshot.futureOrder)
     return;
+
+  snapshot.spotOrder.info = snapshot.spotOrder.info || {}
+  snapshot.futureOrder.info = snapshot.futureOrder.info || {}
 
   let spotDone = snapshot.spotOrder.remaining == 0,
     futureDone = snapshot.futureOrder.remaining == 0
@@ -100,6 +106,30 @@ const processAttempt = async (
     spotDone = done(snapshot.spotOrder)
     futureDone = done(snapshot.futureOrder)
   }
+
+  const redo: Order | false =
+    snapshot.spotOrder.info?.source == 'redo' ?
+      snapshot.spotOrder.info.original : false
+
+  const quantity = redo ?
+    -(redo.remaining + redo.filled) :
+    snapshot.spotOrder.filled + snapshot.spotOrder.remaining
+
+  if (direction == ArbitrageDirection.Entry) {
+    entry.remainingQuantity -= quantity
+
+    const quantityExecuted = entry.quantity - entry.remainingQuantity
+
+    step.executed = !isOutsideTolerance(
+      entry.quantity,
+      quantityExecuted,
+      10
+    )
+  } else {
+    entry.exited += quantity
+
+    step.executed = entry.exited == entry.quantity
+  }
 }
 
 const runStep = async ({
@@ -124,7 +154,14 @@ const runStep = async ({
     stepManager.exit
 
   const eachAttempt = (attempt: OrderSnapshot) =>
-    processAttempt(attempt, spotOrdersCatch, futureOrdersCatch)
+    processAttempt(
+      attempt,
+      entry,
+      step,
+      direction,
+      spotOrdersCatch,
+      futureOrdersCatch
+    )
 
   const eachPromise = async (p: Promise<OrderBook>): Promise<OrderSnapshot> => {
     try {

@@ -128,6 +128,16 @@ const redo = async (
     quantity.future > 0 ? redoFuture(undefined, quantity.future) : snapshot.futureOrder
   ])
 
+  spotOrder.info = { 
+    source: 'redo',
+    original: snapshot.spotOrder
+  }
+
+  futureOrder.info = { 
+    source: 'redo',
+    original: snapshot.futureOrder
+  }
+
   return { spotOrder, futureOrder }
 }
 
