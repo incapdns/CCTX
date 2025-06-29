@@ -210,10 +210,14 @@ export const runArbitrage = async ({ symbol, exchange, quantity: amount, ...othe
 
   const stepManager: StepManager = {
     entry: {
-      executed: false
+      executed: false,
+      spot: {},
+      future: {}
     },
     exit: {
-      executed: false
+      executed: false,
+      spot: {},
+      future: {}
     }
   }
 
