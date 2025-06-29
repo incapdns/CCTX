@@ -62,8 +62,8 @@ export const runExitArbitrage = async ({
 
   const exitArbitrage = doArbitrage({
     direction: ArbitrageDirection.Exit,
-    spotBook: spotBook.asks,
-    futureBook: futureBook.bids,
+    spotBook: spotBook.bids,
+    futureBook: futureBook.asks,
     executed: quantityExecuted,
     percent
   })
