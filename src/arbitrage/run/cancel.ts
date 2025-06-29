@@ -140,7 +140,7 @@ const redo = async (
       previous: snapshot.spotOrder?.info?.previous
     }
 
-    spotOrder.filled = spotOrder.filled ?? 0 + spotOrder.remaining ?? 0
+    spotOrder.filled = (spotOrder.filled ?? 0) + (spotOrder.remaining ?? 0)
     spotOrder.remaining = 0
 
     futureOrder.info = {
@@ -148,7 +148,7 @@ const redo = async (
       previous: snapshot.futureOrder?.info?.previous
     }
 
-    futureOrder.filled = futureOrder.filled ?? 0 + futureOrder.remaining ?? 0
+    futureOrder.filled = (futureOrder.filled) ?? 0 + (futureOrder.remaining ?? 0)
     futureOrder.remaining = 0
 
     return { spotOrder, futureOrder }
