@@ -1,7 +1,7 @@
 import Decimal from 'decimal.js';
 import { ArbitrageDirection, ArbitrageOrder, ArbitrageRequest, ArbitrageResult, cleanResidual, findMaxPrice } from './common';
 
-const isOutsideTolerance = (base: Decimal.Value, target: Decimal.Value, percent: Decimal.Value): boolean => {
+export const isOutsideTolerance = (base: Decimal.Value, target: Decimal.Value, percent: Decimal.Value): boolean => {
   const baseDecimal = Decimal(base);
   const targetDecimal = Decimal(target);
   const percentDecimal = Decimal(percent);
@@ -17,7 +17,7 @@ export const doEntryArbitrage = ({
   spotBook,
   futureBook,
   amount,
-  marginAmountPercent,
+  marginQuantityPercent,
   percent
 }: ArbitrageRequest<ArbitrageDirection.Entry>): ArbitrageResult<ArbitrageDirection.Entry> => {
   const spotOrders = spotBook.map(([price, qty]) => [Decimal(price), Decimal(qty)])
@@ -62,7 +62,7 @@ export const doEntryArbitrage = ({
 
     const value = spotPrice.mul(currentQty)
     totalSpot = totalSpot.plus(value)
-    available = available.minus(value)
+    available = available.minus(currentQty)
 
     const spotOrder = spotOrderResults[spotOrderResults.length - 1]
 
@@ -110,8 +110,8 @@ export const doEntryArbitrage = ({
     qty = qty.plus(currentQty)
 
     completed =
-      !isOutsideTolerance(amount, totalSpot, marginAmountPercent) &&
-      !isOutsideTolerance(amount, totalFuture, marginAmountPercent)
+      !isOutsideTolerance(amount, totalSpot, marginQuantityPercent) &&
+      !isOutsideTolerance(amount, totalFuture, marginQuantityPercent)
   }
 
   const profit = totalFuture.minus(totalSpot)

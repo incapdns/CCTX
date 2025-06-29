@@ -2,36 +2,193 @@ import { Order } from "ccxt";
 import { Exchange } from "../../exchange";
 import { ArbitrageDirection } from "../compute/common";
 import { CancelOrderError, tryCancel } from './cancel';
-import { catchOrders, CatchReturn } from './catch';
-import { ArbitrageNonce, prepareCreateOrder, Step, syncOrder } from './common';
+import { catchOrders, CatchReturn, OrderCatch } from './catch';
+import { ArbitrageNonce, OrderSnapshot, StepManager, syncOrder } from './common';
 import { runEntryArbitrage } from './steps/entry';
 import { runExitArbitrage } from './steps/exit';
-import Decimal from "decimal.js";
 
 export interface Arbitrage {
   symbol: string,
   exchange: Exchange,
-  amount: number,
+  quantity: number,
   timeout: number,
   resume: string
 }
 
 export interface Entry {
   profitPercent: number,
+  /** Total of quantity executed */
   executed: number,
-  amount: number
+  /** The user input quantity to be executed */
+  quantity: number,
+  /** Remaining quantity to be executed */
+  remainingQuantity: number
 }
 
-const rethrow = (e: any) => {
-  const shouldThrow =
+const catchCancelOrder = async (
+  e: any,
+  exchange: Exchange,
+  symbol: string,
+  spotOrdersCatch: OrderCatch,
+  futureOrdersCatch: OrderCatch
+) => {
+  const shouldCancel =
     typeof e == 'object' &&
     e instanceof CancelOrderError
 
-  if (shouldThrow)
-    throw e
+  if (!shouldCancel)
+    return
+
+  return await tryCancel(
+    exchange,
+    symbol,
+    {
+      spotOrder: e.getSpotOrder(),
+      futureOrder: e.getFutureOrder()
+    },
+    spotOrdersCatch,
+    futureOrdersCatch
+  )
 }
 
-export const runArbitrage = async ({ symbol, exchange, amount, ...other }: Arbitrage) => {
+interface RunStep {
+  stepManager: StepManager,
+  direction: ArbitrageDirection,
+  exchange: Exchange,
+  arbitrageNonce: ArbitrageNonce,
+  spotOrdersCatch: OrderCatch,
+  futureOrdersCatch: OrderCatch,
+  timeout: number,
+  entry: Entry,
+  symbol: string,
+}
+
+const processAttempt = async (
+  snapshot: OrderSnapshot,
+  spotOrdersCatch: OrderCatch,
+  futureOrdersCatch: OrderCatch,
+) => {
+  if (!snapshot || !snapshot.spotOrder || !snapshot.futureOrder)
+    return;
+
+  let spotDone = snapshot.spotOrder.remaining == 0,
+    futureDone = snapshot.futureOrder.remaining == 0
+
+  const lastNonces = { spot: -1, future: -1 }
+
+  const done = (order: Order) =>
+    order.remaining == 0
+
+  while (!spotDone || !futureDone) {
+    const [spot, future] = await Promise.race([
+      Promise.all([
+        !spotDone ? spotOrdersCatch.next(lastNonces.spot + 1) : [],
+        !futureDone ? futureOrdersCatch.next(lastNonces.future + 1) : []
+      ])
+    ]) as [CatchReturn, CatchReturn]
+
+    if (spot.nonce != undefined)
+      lastNonces.spot = spot.nonce
+
+    if (future.nonce != undefined)
+      lastNonces.future = future.nonce
+
+    syncOrder([snapshot.spotOrder], spot)
+    syncOrder([snapshot.futureOrder], future)
+
+    spotDone = done(snapshot.spotOrder)
+    futureDone = done(snapshot.futureOrder)
+  }
+}
+
+const runStep = async ({
+  stepManager,
+  direction,
+  exchange,
+  arbitrageNonce,
+  spotOrdersCatch,
+  futureOrdersCatch,
+  timeout,
+  entry,
+  symbol
+}: RunStep) => {
+  const futureSymbol = `${symbol}:USDT`
+
+  const stepFn = direction == ArbitrageDirection.Entry ?
+    runEntryArbitrage :
+    runExitArbitrage
+
+  const step = direction == ArbitrageDirection.Entry ?
+    stepManager.entry :
+    stepManager.exit
+
+  while (exchange.running.includes(symbol) && !step.executed) {
+    const attempts: Array<Promise<{
+      spotOrder: Order;
+      futureOrder: Order;
+    }>> = []
+
+    attempts.push(
+      exchange
+        .getManager()
+        .watchOrderBook(symbol, 10)
+        .then(result => (
+          step.spot.result = result,
+          stepFn({
+            exchange,
+            symbol,
+            entry,
+            step,
+            arbitrageNonce,
+            timeout,
+            spotOrdersCatch,
+            futureOrdersCatch
+          })
+        ))
+        .catch(err =>
+          catchCancelOrder(err, exchange, symbol, spotOrdersCatch, futureOrdersCatch)
+        )
+    )
+
+    attempts.push(
+      exchange
+        .getManager()
+        .watchOrderBook(futureSymbol, 10)
+        .then(result => (
+          step.future.result = result,
+          stepFn({
+            exchange,
+            symbol,
+            entry,
+            step,
+            arbitrageNonce,
+            spotOrdersCatch,
+            futureOrdersCatch,
+            timeout
+          })
+        ))
+        .catch(err =>
+          catchCancelOrder(err, exchange, futureSymbol, spotOrdersCatch, futureOrdersCatch)
+        )
+    )
+
+    const [first, second] = await Promise.all(attempts)
+
+    processAttempt(
+      first,
+      spotOrdersCatch,
+      futureOrdersCatch
+    )
+
+    processAttempt(
+      second,
+      spotOrdersCatch,
+      futureOrdersCatch
+    )
+  }
+}
+
+export const runArbitrage = async ({ symbol, exchange, quantity: amount, ...other }: Arbitrage) => {
   const manager = exchange.getManager()
 
   await manager.loadMarkets()
@@ -41,37 +198,23 @@ export const runArbitrage = async ({ symbol, exchange, amount, ...other }: Arbit
   const entry: Entry = {
     profitPercent: 0,
     executed: 0,
-    amount
+    quantity: amount,
+    remainingQuantity: amount
   }
 
   if (exchange.running.includes(symbol))
     return
 
-  try {
-    const spotMarket = manager.market(symbol)
-    const minSpotCost = spotMarket.limits.cost?.min ?? 0
-
-    const futureMarket = manager.market(`${symbol}:USDT`)
-    const minFutureCost = futureMarket.limits.cost?.min ?? 0
-
-    const valid =
-      amount >= minSpotCost * 1.07 &&
-      amount >= minFutureCost * 1.07
-
-    if (!valid)
-      return
-  } catch (err) {
-    return
-  }
-
   exchange.running.push(symbol)
   exchange.running.push(`${symbol}:USDT`)
 
-  const step: Step = {
-    direction: ArbitrageDirection.Entry,
-    executed: false,
-    spot: {},
-    future: {}
+  const stepManager: StepManager = {
+    entry: {
+      executed: false
+    },
+    exit: {
+      executed: false
+    }
   }
 
   const arbitrageNonce: ArbitrageNonce = {
@@ -97,106 +240,39 @@ export const runArbitrage = async ({ symbol, exchange, amount, ...other }: Arbit
     exchange.running.splice(symbolIndex, 2)
   }
 
-  const stepFns = [runEntryArbitrage, runExitArbitrage]
+  const directions = [
+    ArbitrageDirection.Entry,
+    ArbitrageDirection.Exit
+  ]
 
   if (other.resume) {
     const parts = other.resume.split(',')
     if (parts.length == 2) {
-      stepFns.splice(0, 1)
-      step.direction = ArbitrageDirection.Exit
       const values = parts.map(Number)
-      entry.executed = values[0]
+      entry.quantity = values[0]
+      entry.executed = entry.quantity
+      entry.remainingQuantity = 0
       entry.profitPercent = values[1]
     }
+
+    directions.splice(0, 1)
   }
 
-  for (const stepFn of stepFns) {
-    step.promise = new Promise(resolve => step.resolve = resolve)
+  const promises = directions.map(direction => 
+    runStep({
+      stepManager,
+      direction,
+      exchange,
+      arbitrageNonce,
+      spotOrdersCatch,
+      futureOrdersCatch,
+      timeout: other.timeout,
+      entry,
+      symbol
+    })
+  )
 
-    while (exchange.running.includes(symbol) && !step.executed) {
-      try {
-        step.spot.promise = exchange
-          .getManager()
-          .watchOrderBook(symbol, 10)
-          .then(result => (
-            step.spot.result = result,
-            stepFn({
-              exchange,
-              symbol,
-              entry,
-              step,
-              arbitrageNonce,
-              timeout: other.timeout,
-              spotOrdersCatch,
-              futureOrdersCatch
-            })
-          ))
-          .catch(rethrow)
-
-        step.future.promise = exchange
-          .getManager()
-          .watchOrderBook(`${symbol}:USDT`, 10)
-          .then(result => (
-            step.future.result = result,
-            stepFn({
-              exchange,
-              symbol,
-              entry,
-              step,
-              arbitrageNonce,
-              spotOrdersCatch,
-              futureOrdersCatch,
-              timeout: other.timeout
-            })
-          ))
-          .catch(rethrow)
-
-        await Promise.all([
-          step.spot.promise,
-          step.future.promise
-        ])
-      } catch (e) {
-        const shouldCancel =
-          typeof e == 'object' &&
-          e instanceof CancelOrderError
-
-        if (shouldCancel) {
-          const needExit =
-            await tryCancel(
-              exchange,
-              symbol,
-              {
-                spotOrder: e.getSpotOrder(),
-                futureOrder: e.getFutureOrder()
-              },
-              spotOrdersCatch,
-              futureOrdersCatch
-            )
-
-          if (needExit)
-            return await exit()
-        } else {
-          return await exit()
-        }
-      }
-    }
-
-    const { spotOrder, futureOrder } = await step.promise
-
-    const profitPercent = Decimal(futureOrder.average)
-      .minus(spotOrder.average)
-      .div(spotOrder.average)
-      .mul(100)
-
-    entry.profitPercent = profitPercent.toNumber()
-
-    step.executed = false
-    step.direction = ArbitrageDirection.Exit
-    delete step.future
-    delete step.spot
-    delete arbitrageNonce.future
-    delete arbitrageNonce.spot
-  }
+  await Promise.all(promises)
 
   await exit()
 }

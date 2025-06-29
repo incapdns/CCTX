@@ -9,20 +9,20 @@ export interface OrderSnapshot {
 }
 
 export interface Step {
-  direction: ArbitrageDirection,
-  executed: boolean;
+  executed: boolean,
   spot?: {
-    promise?: Promise<void>,
     result?: OrderBook,
     lastPrice?: [number, number],
   },
   future?: {
-    promise?: Promise<void>,
     result?: OrderBook,
     lastPrice?: [number, number],
-  },
-  promise?: Promise<OrderSnapshot>,
-  resolve?: (orders: OrderSnapshot) => void,
+  }
+}
+
+export interface StepManager {
+  entry: Step;
+  exit: Step;
 }
 
 export interface ArbitrageNonce {

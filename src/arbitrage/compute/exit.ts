@@ -76,21 +76,12 @@ export const doExitArbitrage = ({ spotBook, futureBook, executed, percent }: Arb
       j++
   }
 
-  if (cleanResidual(available).gt(0))
-    return {
-      completed: false,
-      spotOrders: [],
-      futureOrders: [],
-      maxPrice: {
-        spot: 0,
-        future: 0
-      }
-    }
+  const completed = cleanResidual(available).eq(0)
 
   const maxPrice = findMaxPrice(futureBook, spotBook, percent)
 
   return {
-    completed: true,
+    completed,
     spotOrders: spotOrderResults,
     futureOrders: futuresOrderResults,
     maxPrice: {

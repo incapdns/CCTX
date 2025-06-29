@@ -1,6 +1,6 @@
 import { Exchange as CcxtExchange, Order } from 'ccxt';
 import { Exchange } from "../../exchange";
-import { OrderCatch } from './catch';
+import { CatchReturn, OrderCatch } from './catch';
 import { cancelWithRetry, OrderSnapshot, prepareCreateOrder, syncOrder } from './common';
 
 export class CancelOrderError extends Error {
@@ -44,7 +44,8 @@ const commonFilter = (order: Order) =>
 const syncNext = async (
   { spotOrder, futureOrder }: OrderSnapshot,
   spotOrdersCatch: OrderCatch,
-  futureOrdersCatch: OrderCatch
+  futureOrdersCatch: OrderCatch,
+  lastNonces: { spot: number, future: number }
 ) => {
   const done = (order: Order) =>
     commonFilter(order) &&
@@ -55,9 +56,15 @@ const syncNext = async (
   const futureDone = !futureOrder || done(futureOrder)
 
   const [spot, future] = await Promise.all([
-    !spotDone ? spotOrdersCatch.next() : [],
-    !futureDone ? futureOrdersCatch.next() : []
-  ])
+    !spotDone ? spotOrdersCatch.next(lastNonces.spot + 1) : [],
+    !futureDone ? futureOrdersCatch.next(lastNonces.future + 1) : []
+  ]) as [CatchReturn, CatchReturn]
+
+  if(spot.nonce != undefined)
+    lastNonces.spot = spot.nonce
+
+  if(future.nonce != undefined)
+    lastNonces.future = future.nonce
 
   syncOrder([spotOrder], spot)
   syncOrder([futureOrder], future)
@@ -98,7 +105,7 @@ const redo = async (
   snapshot: OrderSnapshot,
   manager: CcxtExchange,
   symbol: string
-) => {
+): Promise<OrderSnapshot> => {
   let quantity = { spot: 0, future: 0 }
 
   if(snapshot.spotOrder)
@@ -116,12 +123,12 @@ const redo = async (
   const redoSpot = prepareCreateOrder(manager, symbol, 'sell')
   const redoFuture = prepareCreateOrder(manager, `${symbol}:USDT`, 'buy', true)
 
-  await Promise.allSettled([
-    quantity.spot > 0 && redoSpot(undefined, quantity.spot),
-    quantity.future > 0 && redoFuture(undefined, quantity.future)
+  const [spotOrder, futureOrder] = await Promise.all([
+    quantity.spot > 0 ? redoSpot(undefined, quantity.spot) : snapshot.spotOrder,
+    quantity.future > 0 ? redoFuture(undefined, quantity.future) : snapshot.futureOrder
   ])
 
-  return true
+  return { spotOrder, futureOrder }
 }
 
 export const tryCancel = async (
@@ -130,9 +137,9 @@ export const tryCancel = async (
   snapshot: OrderSnapshot,
   spotOrdersCatch: OrderCatch,
   futureOrdersCatch: OrderCatch,
-): Promise<boolean> => {
+): Promise<OrderSnapshot> => {
   if(!snapshot.futureOrder && !snapshot.spotOrder)
-    return true
+    return snapshot
 
   const manager = exchange.getManager()
 
@@ -148,7 +155,7 @@ export const tryCancel = async (
   )
 
   if (canContinue(snapshot))
-    return false
+    return snapshot
 
   if (canRedo(snapshot))
     return await redo(
@@ -157,15 +164,18 @@ export const tryCancel = async (
       symbol
     )
 
+  const lastNonces = { spot: -1, future: -1 }
+
   while (true) {
     await syncNext(
       snapshot,
       spotOrdersCatch,
-      futureOrdersCatch
+      futureOrdersCatch,
+      lastNonces
     )
 
     if (canContinue(snapshot))
-      return false
+      return snapshot
 
     if (canRedo(snapshot))
       return await redo(
