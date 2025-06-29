@@ -118,9 +118,18 @@ const processAttempt = async (
     snapshot.spotOrder.info?.source == 'redo' ?
       snapshot.spotOrder.info.original : false
 
+  const previous: number = 
+    ((snapshot.spotOrder.info?.previous?.filled ?? 0) + (snapshot.spotOrder.info?.previous?.remaining ?? 0)) ||
+    ((snapshot.futureOrder.info?.previous?.filled ?? 0) + (snapshot.futureOrder.info?.previous?.remaining ?? 0))
+
+  const notPrevious: number = 
+    snapshot.spotOrder.info?.previous ?
+      snapshot.futureOrder.filled + snapshot.futureOrder.remaining :
+      snapshot.spotOrder.filled + snapshot.spotOrder.remaining
+
   const quantity = redo ?
     0 :
-    snapshot.spotOrder.filled + snapshot.spotOrder.remaining
+    notPrevious + previous
 
   if (direction == ArbitrageDirection.Entry) {
     entry.remainingQuantity -= quantity

@@ -82,16 +82,18 @@ export const retryOrder = (
 
       const order: ArbitrageOrder = {
         price: newPrice,
-        quantity: result[key].remaining
+        quantity: result[key].remaining,
       }
 
       if (!validOrder(order, market))
         return resolver()
 
       try {
+        const previous = result[key]
         result[key] = await createOrder(order)
         result[key].side = side
         result[key].symbol = symbol
+        result[key].info = { previous }
       } catch (err) { }
 
       resolver()
