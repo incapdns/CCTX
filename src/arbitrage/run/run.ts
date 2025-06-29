@@ -13,7 +13,9 @@ export interface Arbitrage {
   exchange: Exchange,
   quantity: number,
   timeout: number,
-  resume: string
+  resume: string,
+  entryPercent: number,
+  exitPercent: number,
 }
 
 export interface Entry {
@@ -66,6 +68,7 @@ interface RunStep {
   timeout: number,
   entry: Entry,
   symbol: string,
+  percent: number
 }
 
 const processAttempt = async (
@@ -128,7 +131,7 @@ const processAttempt = async (
       quantityExecuted,
       10
     )
-    entry.temp.entry = entry.quantity - entry.remainingQuantity
+    entry.temp.entry = quantityExecuted
   } else {
     entry.exited += quantity
     step.executed = entry.exited == entry.quantity
@@ -148,7 +151,8 @@ const runStep = async ({
   futureOrdersCatch,
   timeout,
   entry,
-  symbol
+  symbol,
+  percent
 }: RunStep) => {
   const futureSymbol = `${symbol}:USDT`
 
@@ -182,7 +186,8 @@ const runStep = async ({
         arbitrageNonce,
         timeout,
         spotOrdersCatch,
-        futureOrdersCatch
+        futureOrdersCatch,
+        percent
       })
         .catch(e =>
           catchCancelOrder(e, exchange, symbol, spotOrdersCatch, futureOrdersCatch)
@@ -223,7 +228,15 @@ const runStep = async ({
   }
 }
 
-export const runArbitrage = async ({ symbol, exchange, quantity: amount, ...other }: Arbitrage) => {
+export const runArbitrage = async ({ 
+  symbol, 
+  exchange, 
+  quantity, 
+  timeout, 
+  entryPercent, 
+  exitPercent,
+  resume
+}: Arbitrage) => {
   const manager = exchange.getManager()
 
   await manager.loadMarkets()
@@ -233,8 +246,8 @@ export const runArbitrage = async ({ symbol, exchange, quantity: amount, ...othe
   const entry: Entry = {
     profitPercent: 0,
     exited: 0,
-    quantity: amount,
-    remainingQuantity: amount,
+    quantity: quantity,
+    remainingQuantity: quantity,
     temp: {
       entry: 0,
       exit: 0
@@ -290,8 +303,8 @@ export const runArbitrage = async ({ symbol, exchange, quantity: amount, ...othe
     ArbitrageDirection.Exit
   ]
 
-  if (other.resume) {
-    const parts = other.resume.split(',')
+  if (resume) {
+    const parts = resume.split(',')
     if (parts.length > 0) {
       const values = parts.map(Number)
       entry.quantity = values[0]
@@ -311,9 +324,12 @@ export const runArbitrage = async ({ symbol, exchange, quantity: amount, ...othe
       arbitrageNonce,
       spotOrdersCatch,
       futureOrdersCatch,
-      timeout: other.timeout,
+      timeout,
       entry,
-      symbol
+      symbol,
+      percent: direction == ArbitrageDirection.Entry ? 
+        entryPercent : 
+        exitPercent
     })
   )
 

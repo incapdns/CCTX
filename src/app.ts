@@ -28,12 +28,17 @@ const server = http.createServer((req, res) => {
   if(!(quantity > 0) && !resume)
     return res.end('Invalid quantity')
 
+  const entryPercent = Number(url.searchParams.get('entryPercent') ?? '0.50')
+  const exitPercent = Number(url.searchParams.get('exitPercent') ?? '0')
+
   runArbitrage({
     symbol,
     exchange: getExchange(0, 'mexc'),
     quantity,
     timeout: 10000,
-    resume
+    resume,
+    entryPercent,
+    exitPercent
   })
 
   res.end('Ok')

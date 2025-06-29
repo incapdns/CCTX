@@ -17,10 +17,9 @@ interface EntryArbitrage {
   arbitrageNonce: ArbitrageNonce,
   spotOrdersCatch: OrderCatch,
   futureOrdersCatch: OrderCatch,
-  timeout: number
+  timeout: number,
+  percent: number
 }
-
-const percent = 0.40
 
 export const runEntryArbitrage = async ({
   exchange,
@@ -30,7 +29,8 @@ export const runEntryArbitrage = async ({
   arbitrageNonce,
   spotOrdersCatch,
   futureOrdersCatch,
-  timeout
+  timeout,
+  percent
 }: EntryArbitrage) => {
   if (step.executed)
     return
