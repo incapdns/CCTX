@@ -1,5 +1,4 @@
 import { Order } from 'ccxt';
-import Decimal from 'decimal.js';
 import { Exchange } from "../../../exchange";
 import { doArbitrage } from '../../compute';
 import { ArbitrageDirection } from "../../compute/common";
@@ -22,13 +21,6 @@ interface EntryArbitrage {
 }
 
 const percent = 0.40
-
-const limitToPrecision = (value: Decimal.Value, reference: Decimal.Value): Decimal => {
-  const result = Decimal(value)
-    .toDecimalPlaces(Decimal(reference).dp(), Decimal.ROUND_DOWN)
-
-  return result
-}
 
 export const runEntryArbitrage = async ({
   exchange,
@@ -103,6 +95,7 @@ export const runEntryArbitrage = async ({
   const { spotArbitrageOrder, futureArbitrageOrder, executed } = computeOrders(
     entry,
     exchange,
+    entry.remainingQuantity,
     entryArbitrage,
     spotMarket,
     futureMarket,
@@ -114,9 +107,11 @@ export const runEntryArbitrage = async ({
 
   entry.remainingQuantity -= executed;
 
+  const quantityExecuted = entry.quantity - entry.remainingQuantity
+
   if (!isOutsideTolerance(
     entry.quantity,
-    entry.remainingQuantity,
+    quantityExecuted,
     10
   )) {
     step.executed = true

@@ -1,9 +1,7 @@
 import { Order } from 'ccxt';
-import Decimal from 'decimal.js';
 import { Exchange } from "../../../exchange";
 import { doArbitrage } from '../../compute';
 import { ArbitrageDirection } from "../../compute/common";
-import { isOutsideTolerance } from '../../compute/entry';
 import { CancelOrderError } from '../cancel';
 import { CatchReturn, OrderCatch } from '../catch';
 import { ArbitrageNonce, createOrderValidator, prepareCreateOrder, Step, syncOrder } from '../common';
@@ -60,11 +58,13 @@ export const runExitArbitrage = async ({
   const spotMarket = manager.market(symbol)
   const futureMarket = manager.market(`${symbol}:USDT`)
 
+  const quantityExecuted = entry.quantity - entry.remainingQuantity
+
   const exitArbitrage = doArbitrage({
     direction: ArbitrageDirection.Exit,
     spotBook: spotBook.asks,
     futureBook: futureBook.bids,
-    executed: entry.executed,
+    executed: quantityExecuted,
     percent
   })
 
@@ -92,9 +92,12 @@ export const runExitArbitrage = async ({
   delete step.future.result
   delete step.spot.result
 
+  const remainingQuantityForExit = entry.quantity - entry.exited
+
   const { spotArbitrageOrder, futureArbitrageOrder, executed } = computeOrders(
     entry,
     exchange,
+    remainingQuantityForExit,
     exitArbitrage,
     spotMarket,
     futureMarket,
@@ -104,15 +107,9 @@ export const runExitArbitrage = async ({
   if(!spotArbitrageOrder || !futureArbitrageOrder)
     return
 
-  entry.remainingQuantity -= executed;
+  entry.exited += executed;
 
-  if (!isOutsideTolerance(
-    entry.quantity,
-    entry.remainingQuantity,
-    10
-  )) {
-    step.executed = true
-  }
+  step.executed = entry.exited == entry.quantity
 
   const [spotOrder, futureOrder] = await Promise.allSettled([
     createSellSpotOrder(spotArbitrageOrder),

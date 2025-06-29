@@ -82,6 +82,7 @@ export const doExitArbitrage = ({ spotBook, futureBook, executed, percent }: Arb
 
   return {
     completed,
+    executed: executed - cleanResidual(available).toNumber(),
     spotOrders: spotOrderResults,
     futureOrders: futuresOrderResults,
     maxPrice: {

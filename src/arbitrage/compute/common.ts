@@ -17,12 +17,12 @@ export interface CommonResult {
     spot: number;
     future: number;
   }
+  executed: number;
   completed: boolean;
 }
 
 export type ArbitrageResults = {
   [ArbitrageDirection.Entry]: CommonResult & {
-    executed: number;
     profitPercent: number
   }
   [ArbitrageDirection.Exit]: CommonResult;

@@ -17,12 +17,12 @@ export interface Arbitrage {
 
 export interface Entry {
   profitPercent: number,
-  /** Total of quantity executed */
-  executed: number,
   /** The user input quantity to be executed */
   quantity: number,
   /** Remaining quantity to be executed */
-  remainingQuantity: number
+  remainingQuantity: number,
+  /** Total quantity that was exited */
+  exited: number,
 }
 
 const catchCancelOrder = async (
@@ -197,7 +197,7 @@ export const runArbitrage = async ({ symbol, exchange, quantity: amount, ...othe
 
   const entry: Entry = {
     profitPercent: 0,
-    executed: 0,
+    exited: 0,
     quantity: amount,
     remainingQuantity: amount
   }
@@ -250,15 +250,15 @@ export const runArbitrage = async ({ symbol, exchange, quantity: amount, ...othe
     if (parts.length == 2) {
       const values = parts.map(Number)
       entry.quantity = values[0]
-      entry.executed = entry.quantity
-      entry.remainingQuantity = 0
+      entry.exited = 0
+      entry.remainingQuantity = entry.quantity
       entry.profitPercent = values[1]
     }
 
     directions.splice(0, 1)
   }
 
-  const promises = directions.map(direction => 
+  const promises = directions.map(direction =>
     runStep({
       stepManager,
       direction,

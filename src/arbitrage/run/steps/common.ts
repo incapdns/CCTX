@@ -1,6 +1,6 @@
 import { Market, Order, Exchange as CcxtExchange } from "ccxt";
 import { Exchange } from "../../../exchange";
-import { ArbitrageOrder, ArbitrageResult } from "../../compute/common";
+import { ArbitrageDirection, ArbitrageOrder, ArbitrageResult } from "../../compute/common";
 import { OrderCatch } from "../catch";
 import { cancelWithRetry, Step, syncOrder } from "../common";
 import Decimal from "decimal.js";
@@ -201,7 +201,8 @@ export type MaybeOrders = {
 export const computeOrders = (
   entry: Entry,
   exchange: Exchange,
-  arbitrage: ArbitrageResult<any>,
+  limit: number,
+  arbitrage: ArbitrageResult<ArbitrageDirection.Entry> | ArbitrageResult<ArbitrageDirection.Exit>,
   spotMarket: Market,
   futureMarket: Market,
   validOrder: (order: ArbitrageOrder, market: Market) => boolean
@@ -213,7 +214,7 @@ export const computeOrders = (
   const futureMinContracts = futureMarket.limits?.amount?.min ?? 0
   const futureMin = futureMinContracts * contractSize
 
-  let executed = arbitrage.executed
+  let executed = Math.min(arbitrage.executed, limit)
 
   for (let i = 0; i < 5; i++) {
     executed = computeCommonQuantity(
