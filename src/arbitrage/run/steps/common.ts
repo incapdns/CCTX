@@ -1,9 +1,8 @@
-import { Market, Order, Exchange as CcxtExchange } from "ccxt";
+import { Exchange as CcxtExchange, Market, Order } from "ccxt";
 import { Exchange } from "../../../exchange";
 import { ArbitrageDirection, ArbitrageOrder, ArbitrageResult } from "../../compute/common";
 import { OrderCatch } from "../catch";
 import { cancelWithRetry, Step, syncOrder } from "../common";
-import Decimal from "decimal.js";
 import { Entry } from "../run";
 
 export const rejectTimeout = <T>(ms: number): {
