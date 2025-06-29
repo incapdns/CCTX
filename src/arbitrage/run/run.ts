@@ -205,6 +205,8 @@ const runStep = async ({
   }
 
   while (exchange.running.includes(symbol) && !step.executed) {
+    await step.lastOrder?.promise
+
     const promises: Array<Promise<OrderBook>> = []
 
     promises.push(
@@ -274,13 +276,11 @@ export const runArbitrage = async ({
       executed: false,
       spot: {},
       future: {},
-      orders: []
     },
     exit: {
       executed: false,
       spot: {},
       future: {},
-      orders: []
     },
   }
 

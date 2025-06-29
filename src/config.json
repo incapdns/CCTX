@@ -2,14 +2,14 @@
     "exchanges": {
         "mexc": {
             "enableRateLimit": false,
-            "apiKey": "mx0vgl85yzq1OILekB",
-            "secret": "b7d2664039284cb2aa911ea3fa38b9f0",
+            "apiKey": "A",
+            "secret": "B",
             "options": {
                 "defaultType": "spot",
                 "adjustForTimeDifference": true,
                 "recvWindow": 10000
             },
-            "webToken": "WEBa9fa6cdd3612be09178fcd749166c2b2f09c5b7b855f995d0c89041e6cf1288a"
+            "webToken": "C"
         }
     }
 }

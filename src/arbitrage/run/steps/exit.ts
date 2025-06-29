@@ -7,7 +7,7 @@ import { CancelOrderError } from '../cancel';
 import { CatchReturn, OrderCatch } from '../catch';
 import { ArbitrageNonce, createOrderValidator, prepareCreateOrder, Step, syncOrder } from '../common';
 import { Entry } from '../run';
-import { computeOrders, isVolatile, rejectTimeout, Result, retryOrder, VolatileDirection, waitTimeout } from './common';
+import { computeOrders, createOrderTracker, isVolatile, rejectTimeout, Result, retryOrder, VolatileDirection, waitTimeout } from './common';
 
 interface ExitArbitrage {
   exchange: Exchange,
@@ -36,6 +36,9 @@ export const runExitArbitrage = async ({
     return
 
   if (!step.future?.result || !step.spot?.result)
+    return
+
+  if(step.lastOrder && !step.lastOrder?.finished)
     return
 
   const sameSpot = arbitrageNonce.spot == step.spot?.result?.nonce
@@ -121,38 +124,23 @@ export const runExitArbitrage = async ({
     validOrder
   ) ?? {}
 
-  if(!spotArbitrageOrder || !futureArbitrageOrder)
+  if(!executed)
     return
 
-  const exists = step
-    .orders
-    .slice(-10)
-    .find(order =>
-      !isOutsideTolerance(order[0], spotArbitrageOrder.price, 25) &&
-      !isOutsideTolerance(order[2], futureArbitrageOrder.price, 25) &&
-      order[4] >= Date.now() - 5000
-    )
-
-  if (exists)
-    return
+  const tracker = createOrderTracker()
+  step.lastOrder = tracker
 
   if (executed > entry.quantity - entry.temp.exit)
     return
 
   entry.temp.exit += executed
-  
-  step.orders.push([
-    spotArbitrageOrder.price,
-    spotArbitrageOrder.quantity,
-    futureArbitrageOrder.price,
-    futureArbitrageOrder.quantity,
-    Date.now()
-  ])
 
   const [spotOrder, futureOrder] = await Promise.allSettled([
     createSellSpotOrder(spotArbitrageOrder),
     createBuyFutureOrder(futureArbitrageOrder)
   ])
+
+  tracker.resolve()
 
   const hasError =
     spotOrder.status === 'rejected' ||

@@ -287,3 +287,17 @@ export const computeOrders = (
 
   return null
 }
+
+export const createOrderTracker = () => {
+  let resolver: (value: void | PromiseLike<void>) => void;
+  const promise = new Promise<void>(resolve => resolver = resolve);
+
+  return {
+    promise,
+    finished: false,
+    resolve: function () {
+      this.finished = true
+      resolver()
+    }
+  }
+}
