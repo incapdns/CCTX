@@ -93,13 +93,11 @@ const canContinue = (snapshot: OrderSnapshot) => {
 const canRedo = (snapshot: OrderSnapshot) => {
   const doneSpot = (order: Order) =>
     commonFilter(order) &&
-    (order.side == 'sell' ||
-      ['closed', 'canceled', 'filled'].includes(order.status))
+    ['closed', 'canceled', 'filled'].includes(order.status)
 
   const doneFuture = (order: Order) =>
     commonFilter(order) &&
-    (order.side == 'buy' ||
-      ['closed', 'canceled', 'filled'].includes(order.status))
+    ['closed', 'canceled', 'filled'].includes(order.status)
 
   const spotDone = !snapshot.spotOrder || doneSpot(snapshot.spotOrder)
   const futureDone = !snapshot.futureOrder || doneFuture(snapshot.futureOrder)
