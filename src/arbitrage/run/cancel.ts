@@ -133,19 +133,23 @@ const redo = async (
   // 4) factories (undefined → market order)
   const futSymbol  = `${symbol}:USDT`
   const redoSpot   = prepareCreateOrder(manager, symbol,    side === 'entry' ? 'buy'  : 'sell')
-  const redoFuture = prepareCreateOrder(manager, futSymbol, side === 'entry' ? 'sell' : 'buy', /*market*/ true)
+  const redoFuture = prepareCreateOrder(manager, futSymbol, side === 'entry' ? 'sell' : 'buy', /*reduceOnly*/ true)
 
-  // 5) executa apenas a perna atrasada e atualiza o filled
-  if (imbalance > 0) {
-    // perna atrasada = spot
-    await redoSpot(undefined, imbalance)
-    spotFilled += imbalance
-  }
-  else {
-    // perna atrasada = future (usa Math.abs pra ficar positivo)
-    const qty = Math.abs(imbalance)
-    await redoFuture(undefined, qty)
-    futureFilled += qty
+  try {
+    // 5) executa apenas a perna atrasada e atualiza o filled
+    if (imbalance > 0) {
+      // perna atrasada = spot
+      await redoSpot(undefined, imbalance)
+      spotFilled += imbalance
+    }
+    else {
+      // perna atrasada = future (usa Math.abs pra ficar positivo)
+      const qty = Math.abs(imbalance)
+      await redoFuture(undefined, qty)
+      futureFilled += qty
+    }
+  } catch(err) {
+    //Do nothing
   }
 
   // 6) devolve somente os filled atualizados e remaining zero
