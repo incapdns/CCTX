@@ -113,9 +113,11 @@ const redo = async (
   symbol:     string,
   side:       'entry' | 'exit',
 ): Promise<OrderSnapshot> => {
+  const contractSize = manager.market(`${symbol}:USDT`)?.contractSize ?? 1
+
   // 1) valores originais
   let spotFilled   = snapshot.spotOrder?.filled   ?? 0
-  let futureFilled = snapshot.futureOrder?.filled ?? 0
+  let futureFilled = (snapshot.futureOrder?.filled ?? 0) * contractSize
 
   // 2) calcula o imbalance em UNIDADES de spot
   const imbalance = side === 'entry'
@@ -125,8 +127,8 @@ const redo = async (
   // 3) se já está equilibrado, devolve filled atual e remaining=0
   if (imbalance === 0) {
     return {
-      spotOrder:   { filled: spotFilled,   remaining: 0 } as Order,
-      futureOrder: { filled: futureFilled, remaining: 0 } as Order,
+      spotOrder:   { filled: spotFilled,   remaining: 0, symbol } as Order,
+      futureOrder: { filled: futureFilled, remaining: 0, symbol: `${symbol}:USDT` } as Order,
     }
   }
 
@@ -139,23 +141,25 @@ const redo = async (
     // 5) executa apenas a perna atrasada e atualiza o filled
     if (imbalance > 0) {
       // perna atrasada = spot
-      await redoSpot(undefined, imbalance)
       spotFilled += imbalance
+      await redoSpot(undefined, imbalance)
     }
     else {
       // perna atrasada = future (usa Math.abs pra ficar positivo)
       const qty = Math.abs(imbalance)
-      await redoFuture(undefined, qty)
       futureFilled += qty
+      await redoFuture(undefined, qty)
     }
   } catch(err) {
     //Do nothing
+  } finally {
+    futureFilled /= contractSize
   }
 
   // 6) devolve somente os filled atualizados e remaining zero
   return {
-    spotOrder:   { filled: spotFilled,   remaining: 0 } as Order,
-    futureOrder: { filled: futureFilled, remaining: 0 } as Order,
+    spotOrder:   { filled: spotFilled,   remaining: 0, symbol } as Order,
+    futureOrder: { filled: futureFilled, remaining: 0, symbol: `${symbol}:USDT` } as Order,
   }
 }
 

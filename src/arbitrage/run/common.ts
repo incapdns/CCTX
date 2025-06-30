@@ -110,12 +110,9 @@ export const createOrderValidator = (exchange: CcxtExchange) => (order: Arbitrag
 
 export const syncOrder = (orders: Order[], updates: Order[]) => {
   for (const order of updates) {
-    let equivalent = orders.find(o => o.id == order.id || o.info?.previous?.id == order.id)
+    let equivalent = orders.find(o => o.id == order.id)
     
     if (!equivalent) continue
-    
-    if(equivalent.id != order.id)
-      equivalent = equivalent.info
     
     equivalent.status = order.status
     equivalent.filled = order.filled
