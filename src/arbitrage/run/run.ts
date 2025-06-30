@@ -207,9 +207,9 @@ export const runArbitrage = async ({
 
   const entry: Entry = {
     profitPercent: 0,
-    exited: 0,
     quantity: quantity,
-    entered: quantity,
+    exited: 0,
+    entered: 0,
     temp: {
       entry: 0,
       exit: 0
