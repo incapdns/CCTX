@@ -111,7 +111,11 @@ export const runExitArbitrage = async ({
   delete step.future.result
   delete step.spot.result
 
-  const remainingQuantityForExit = Math.min(entry.quantity - entry.exited, entry.temp.entry)
+  const remainingQuantityForExit = Math.min(
+    entry.quantity - entry.exited, 
+    entry.temp.entry,
+    exitArbitrage.executed
+  )
 
   const { spotArbitrageOrder, futureArbitrageOrder, executed } = computeOrders(
     entry,

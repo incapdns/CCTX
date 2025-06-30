@@ -81,16 +81,9 @@ const processAttempt = async (
   if (!snapshot || !snapshot.spotOrder || !snapshot.futureOrder)
     return;
 
-  const previous: number = 
-    ((snapshot.spotOrder.info?.previous?.filled ?? 0) + (snapshot.spotOrder.info?.previous?.remaining ?? 0)) ||
-    ((snapshot.futureOrder.info?.previous?.filled ?? 0) + (snapshot.futureOrder.info?.previous?.remaining ?? 0))
-
-  const notPrevious: number = 
-    snapshot.spotOrder.info?.previous ?
-      snapshot.futureOrder.filled + snapshot.futureOrder.remaining :
-      snapshot.spotOrder.filled + snapshot.spotOrder.remaining
-
-  const quantity = notPrevious + previous
+  const quantity = 
+    (snapshot.futureOrder.filled + snapshot.futureOrder.remaining) ||
+    (snapshot.spotOrder.filled + snapshot.spotOrder.remaining)
 
   if (direction == ArbitrageDirection.Entry) {
     entry.remainingQuantity -= quantity
