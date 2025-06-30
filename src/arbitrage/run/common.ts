@@ -37,6 +37,8 @@ export interface ArbitrageNonce {
 export const prepareCreateOrder = (exchange: CcxtExchange, symbol: string, orderSide: OrderSide, reduceOnly = false) => async (order?: ArbitrageOrder, marketQuantity?: number) => {
   while (true) {
     try {
+      reduceOnly = reduceOnly && orderSide === 'buy' 
+      
       return await exchange.createOrder(
         symbol,
         marketQuantity ?
@@ -58,7 +60,7 @@ export const prepareCreateOrder = (exchange: CcxtExchange, symbol: string, order
         ) : undefined,
         {
           recvWindow: 20000,
-          ...reduceOnly && {
+          ...reduceOnly &&{
             reduceOnly: true,
             positionSide: 'SHORT'
           },

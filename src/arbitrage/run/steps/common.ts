@@ -32,74 +32,74 @@ export interface Result {
   }
 }
 
-export const retryOrder = (
-  key: 'futureOrder' | 'spotOrder',
-  exchange: Exchange,
-  result: Result,
-  ordersCatch: OrderCatch,
-  newPrice: number,
-  market: Market,
-  validOrder: (order: ArbitrageOrder, market: Market) => boolean,
-  createOrder: (order: ArbitrageOrder, _?: number) => Promise<Order>
-) => {
-  const targetKey = key == 'futureOrder' ?
-    'nextFuture' :
-    'nextSpot'
+// export const retryOrder = (
+//   key: 'futureOrder' | 'spotOrder',
+//   exchange: Exchange,
+//   result: Result,
+//   ordersCatch: OrderCatch,
+//   newPrice: number,
+//   market: Market,
+//   validOrder: (order: ArbitrageOrder, market: Market) => boolean,
+//   createOrder: (order: ArbitrageOrder, _?: number) => Promise<Order>
+// ) => {
+//   const targetKey = key == 'futureOrder' ?
+//     'nextFuture' :
+//     'nextSpot'
 
-  let resolver: (value: void | PromiseLike<void>) => void;
-  const promise = new Promise<void>(resolve => resolver = resolve)
+//   let resolver: (value: void | PromiseLike<void>) => void;
+//   const promise = new Promise<void>(resolve => resolver = resolve)
 
-  result[targetKey] = {
-    entered: false,
-    promise,
-    timeout: setTimeout(async () => {
-      const target = result[targetKey]
-      target.entered = true
+//   result[targetKey] = {
+//     entered: false,
+//     promise,
+//     timeout: setTimeout(async () => {
+//       const target = result[targetKey]
+//       target.entered = true
 
-      const { side, symbol } = result[key]
-      const canceled = await cancelWithRetry(exchange, result[key])
+//       const { side, symbol } = result[key]
+//       const canceled = await cancelWithRetry(exchange, result[key])
 
-      if (!canceled)
-        return resolver()
+//       if (!canceled)
+//         return resolver()
 
-      const current = ordersCatch.current()
-      syncOrder([result[key]], current)
+//       const current = ordersCatch.current()
+//       syncOrder([result[key]], current)
 
-      if (result[key].remaining == 0)
-        return resolver()
+//       if (result[key].remaining == 0)
+//         return resolver()
 
-      let lastNonce = current.nonce
+//       let lastNonce = current.nonce
 
-      while (!['canceled', 'closed', 'filled'].includes(result[key].status)) {
-        const next = await ordersCatch.next(lastNonce + 1)
-        syncOrder([result[key]], next)
-        lastNonce = next.nonce
+//       while (!['canceled', 'closed', 'filled'].includes(result[key].status)) {
+//         const next = await ordersCatch.next(lastNonce + 1)
+//         syncOrder([result[key]], next)
+//         lastNonce = next.nonce
 
-        /** If the cancelWithRetry doesnt really cancel */
-        if (result[key].remaining == 0)
-          return resolver()
-      }
+//         /** If the cancelWithRetry doesnt really cancel */
+//         if (result[key].remaining == 0)
+//           return resolver()
+//       }
 
-      const order: ArbitrageOrder = {
-        price: newPrice,
-        quantity: result[key].remaining,
-      }
+//       const order: ArbitrageOrder = {
+//         price: newPrice,
+//         quantity: result[key].remaining,
+//       }
 
-      if (!validOrder(order, market))
-        return resolver()
+//       if (!validOrder(order, market))
+//         return resolver()
 
-      try {
-        const previous = result[key]
-        result[key] = await createOrder(order)
-        result[key].side = side
-        result[key].symbol = symbol
-        result[key].info = { previous }
-      } catch (err) { }
+//       try {
+//         const previous = result[key]
+//         result[key] = await createOrder(order)
+//         result[key].side = side
+//         result[key].symbol = symbol
+//         result[key].info = { previous }
+//       } catch (err) { }
 
-      resolver()
-    }, 3000)
-  }
-}
+//       resolver()
+//     }, 3000)
+//   }
+// }
 
 export enum VolatileDirection {
   Spot,

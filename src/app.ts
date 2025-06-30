@@ -35,7 +35,7 @@ const server = http.createServer((req, res) => {
     symbol,
     exchange: getExchange(0, 'mexc'),
     quantity,
-    timeout: 10000,
+    timeout: 5000,
     resume,
     entryPercent,
     exitPercent

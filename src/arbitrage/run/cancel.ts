@@ -113,38 +113,45 @@ const redo = async (
   symbol:     string,
   side:       'entry' | 'exit',
 ): Promise<OrderSnapshot> => {
-  const spotFilled   = snapshot.spotOrder?.filled   ?? 0
-  const futureFilled = snapshot.futureOrder?.filled ?? 0
-  const futSymbol    = `${symbol}:USDT`
+  // 1) valores originais
+  let spotFilled   = snapshot.spotOrder?.filled   ?? 0
+  let futureFilled = snapshot.futureOrder?.filled ?? 0
 
-  // imbalance sempre em UNIDADES de spot
+  // 2) calcula o imbalance em UNIDADES de spot
   const imbalance = side === 'entry'
     ? futureFilled - spotFilled
     : spotFilled - futureFilled
 
+  // 3) se já está equilibrado, devolve filled atual e remaining=0
   if (imbalance === 0) {
-    return snapshot
+    return {
+      spotOrder:   { filled: spotFilled,   remaining: 0 } as Order,
+      futureOrder: { filled: futureFilled, remaining: 0 } as Order,
+    }
   }
 
-  // factories prontas (undefined → market order)
-  const redoSpot   = prepareCreateOrder(manager, symbol,      side === 'entry' ? 'buy'  : 'sell')
-  const redoFuture = prepareCreateOrder(manager, futSymbol,   side === 'entry' ? 'sell' : 'buy', /*market*/ true)
+  // 4) factories (undefined → market order)
+  const futSymbol  = `${symbol}:USDT`
+  const redoSpot   = prepareCreateOrder(manager, symbol,    side === 'entry' ? 'buy'  : 'sell')
+  const redoFuture = prepareCreateOrder(manager, futSymbol, side === 'entry' ? 'sell' : 'buy', /*market*/ true)
 
-  let spotOrder:   Order | undefined = snapshot.spotOrder
-  let futureOrder: Order | undefined = snapshot.futureOrder
-
+  // 5) executa apenas a perna atrasada e atualiza o filled
   if (imbalance > 0) {
     // perna atrasada = spot
-    spotOrder = await redoSpot(undefined, imbalance)
+    await redoSpot(undefined, imbalance)
+    spotFilled += imbalance
   }
   else {
-    // perna atrasada = future (usa Math.abs pra ficar +)
-    futureOrder = await redoFuture(undefined, Math.abs(imbalance))
+    // perna atrasada = future (usa Math.abs pra ficar positivo)
+    const qty = Math.abs(imbalance)
+    await redoFuture(undefined, qty)
+    futureFilled += qty
   }
 
+  // 6) devolve somente os filled atualizados e remaining zero
   return {
-    spotOrder:   spotOrder   ?? { remaining: 0, filled: 0 } as Order,
-    futureOrder: futureOrder ?? { remaining: 0, filled: 0 } as Order,
+    spotOrder:   { filled: spotFilled,   remaining: 0 } as Order,
+    futureOrder: { filled: futureFilled, remaining: 0 } as Order,
   }
 }
 

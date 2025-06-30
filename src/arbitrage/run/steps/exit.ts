@@ -2,12 +2,11 @@ import { Order } from 'ccxt';
 import { Exchange } from "../../../exchange";
 import { doArbitrage } from '../../compute';
 import { ArbitrageDirection } from "../../compute/common";
-import { isOutsideTolerance } from '../../compute/entry';
 import { CancelOrderError } from '../cancel';
 import { CatchReturn, OrderCatch } from '../catch';
 import { ArbitrageNonce, createOrderValidator, prepareCreateOrder, Step, syncOrder } from '../common';
 import { Entry } from '../run';
-import { computeOrders, createOrderTracker, isVolatile, rejectTimeout, Result, retryOrder, VolatileDirection, waitTimeout } from './common';
+import { computeOrders, createOrderTracker, isVolatile, rejectTimeout, Result, VolatileDirection, waitTimeout } from './common';
 
 interface ExitArbitrage {
   exchange: Exchange,
@@ -208,40 +207,6 @@ export const runExitArbitrage = async ({
 
       spotDone = done(result.spotOrder)
       futureDone = done(result.futureOrder)
-
-      if (spotDone &&
-        !futureDone &&
-        !result.nextFuture) {
-        const newFuturePrice = result.spotOrder.average! / (1 + percent / 100)
-
-        retryOrder(
-          'futureOrder',
-          exchange,
-          result,
-          futureOrdersCatch,
-          newFuturePrice,
-          futureMarket,
-          validOrder,
-          createBuyFutureOrder
-        )
-      }
-
-      if (!spotDone &&
-        futureDone &&
-        !result.nextSpot) {
-        const newSpotPrice = result.futureOrder.average! * (1 + percent / 100)
-
-        retryOrder(
-          'spotOrder',
-          exchange,
-          result,
-          spotOrdersCatch,
-          newSpotPrice,
-          spotMarket,
-          validOrder,
-          createSellSpotOrder
-        )
-      }
 
       finished = spotDone && futureDone
     } catch (err) {

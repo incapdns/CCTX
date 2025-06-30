@@ -76,44 +76,10 @@ const processAttempt = async (
   snapshot: OrderSnapshot,
   entry: Entry,
   step: Step,
-  direction: ArbitrageDirection,
-  spotOrdersCatch: OrderCatch,
-  futureOrdersCatch: OrderCatch,
+  direction: ArbitrageDirection
 ) => {
   if (!snapshot || !snapshot.spotOrder || !snapshot.futureOrder)
     return;
-
-  snapshot.spotOrder.info = snapshot.spotOrder.info || {}
-  snapshot.futureOrder.info = snapshot.futureOrder.info || {}
-
-  let spotDone = snapshot.spotOrder.remaining == 0,
-    futureDone = snapshot.futureOrder.remaining == 0
-
-  const lastNonces = { spot: -1, future: -1 }
-
-  const done = (order: Order) =>
-    order.remaining == 0
-
-  while (!spotDone || !futureDone) {
-    const [spot, future] = await Promise.race([
-      Promise.all([
-        !spotDone ? spotOrdersCatch.next(lastNonces.spot + 1) : [],
-        !futureDone ? futureOrdersCatch.next(lastNonces.future + 1) : []
-      ])
-    ]) as [CatchReturn, CatchReturn]
-
-    if (spot.nonce != undefined)
-      lastNonces.spot = spot.nonce
-
-    if (future.nonce != undefined)
-      lastNonces.future = future.nonce
-
-    syncOrder([snapshot.spotOrder], spot)
-    syncOrder([snapshot.futureOrder], future)
-
-    spotDone = done(snapshot.spotOrder)
-    futureDone = done(snapshot.futureOrder)
-  }
 
   const redo: Order | false =
     snapshot.spotOrder.info?.source == 'redo' ?
@@ -179,9 +145,7 @@ const runStep = async ({
       attempt,
       entry,
       step,
-      direction,
-      spotOrdersCatch,
-      futureOrdersCatch
+      direction
     )
 
   const eachPromise = async (p: Promise<OrderBook>): Promise<OrderSnapshot> => {
