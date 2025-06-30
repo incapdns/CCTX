@@ -239,7 +239,8 @@ export const computeOrders = (
     )
     if (executed <= 0) return null
 
-    const nextRemaining = entry.remainingQuantity - executed
+    const remainingQty = entry.quantity - entry.entered
+    const nextRemaining = remainingQty - executed
 
     const diffQtySpot   = spotMinQty   - nextRemaining
     const diffQtyFuture = futureMinQty - nextRemaining

@@ -22,8 +22,8 @@ export interface Entry {
   profitPercent: number,
   /** The user input quantity to be executed */
   quantity: number,
-  /** Remaining quantity to be executed */
-  remainingQuantity: number,
+  /** Total quantity that was entered */
+  entered: number,
   /** Total quantity that was exited */
   exited: number,
   temp: {
@@ -82,19 +82,18 @@ const processAttempt = async (
     return;
 
   const quantity = 
-    (snapshot.futureOrder.filled + snapshot.futureOrder.remaining) ||
-    (snapshot.spotOrder.filled + snapshot.spotOrder.remaining)
+    snapshot.futureOrder.filled ||
+    snapshot.spotOrder.filled
 
   if (direction == ArbitrageDirection.Entry) {
-    entry.remainingQuantity -= quantity
+    entry.entered += quantity
 
-    const quantityExecuted = entry.quantity - entry.remainingQuantity
     step.executed = !isOutsideTolerance(
       entry.quantity,
-      quantityExecuted,
+      entry.entered,
       10
     )
-    entry.temp.entry = quantityExecuted
+    entry.temp.entry = entry.entered
   } else {
     entry.exited += quantity
     step.executed = entry.exited == entry.quantity
@@ -210,7 +209,7 @@ export const runArbitrage = async ({
     profitPercent: 0,
     exited: 0,
     quantity: quantity,
-    remainingQuantity: quantity,
+    entered: quantity,
     temp: {
       entry: 0,
       exit: 0
@@ -270,7 +269,7 @@ export const runArbitrage = async ({
       const values = parts.map(Number)
       entry.quantity = values[0]
       entry.exited = 0
-      entry.remainingQuantity = 0
+      entry.entered = 0
       entry.profitPercent = values[1] ?? 0
     }
 

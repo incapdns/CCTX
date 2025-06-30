@@ -113,7 +113,7 @@ export const runEntryArbitrage = async ({
   delete step.spot.result
 
   const remainingQuantityForEntry = Math.min(
-    entry.remainingQuantity, 
+    entry.quantity - entry.entered, 
     entry.quantity - entry.temp.entry,
     entryArbitrage.executed,
   )
