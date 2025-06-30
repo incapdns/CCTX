@@ -149,7 +149,8 @@ export const runExitArbitrage = async ({
   if (hasError)
     throw new CancelOrderError(
       spotOrder.status == 'fulfilled' ? spotOrder.value : null,
-      futureOrder.status == 'fulfilled' ? futureOrder.value : null
+      futureOrder.status == 'fulfilled' ? futureOrder.value : null,
+      'exit'
     )
 
   let finished = false,
@@ -248,7 +249,8 @@ export const runExitArbitrage = async ({
 
       throw new CancelOrderError(
         result.spotOrder,
-        result.futureOrder
+        result.futureOrder,
+        'exit'
       )
     }
   }

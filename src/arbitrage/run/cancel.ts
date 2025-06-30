@@ -6,12 +6,14 @@ import { cancelWithRetry, OrderSnapshot, prepareCreateOrder, syncOrder } from '.
 export class CancelOrderError extends Error {
   private spotOrder: Order
   private futureOrder: Order
+  private direction: 'entry' | 'exit'
 
-  constructor(spotOrder: Order | null, futureOrder: Order | null) {
+  constructor(spotOrder: Order | null, futureOrder: Order | null, direction: 'entry' | 'exit') {
     super("Not all orders completed")
 
     this.spotOrder = spotOrder
     this.futureOrder = futureOrder
+    this.direction = direction
   }
 
   public getSpotOrder() {
@@ -20,6 +22,10 @@ export class CancelOrderError extends Error {
 
   public getFutureOrder() {
     return this.futureOrder
+  }
+
+  public getDirection() {
+    return this.direction
   }
 }
 
@@ -30,10 +36,10 @@ const syncCurrent = (
 ) => {
   const [spot, future] = [spotOrdersCatch.current(), futureOrdersCatch.current()]
 
-  if(spotOrder)
+  if (spotOrder)
     syncOrder([spotOrder], spot)
 
-  if(futureOrder)
+  if (futureOrder)
     syncOrder([futureOrder], future)
 }
 
@@ -60,10 +66,10 @@ const syncNext = async (
     !futureDone ? futureOrdersCatch.next(lastNonces.future + 1) : []
   ]) as [CatchReturn, CatchReturn]
 
-  if(spot.nonce != undefined)
+  if (spot.nonce != undefined)
     lastNonces.spot = spot.nonce
 
-  if(future.nonce != undefined)
+  if (future.nonce != undefined)
     lastNonces.future = future.nonce
 
   syncOrder([spotOrder], spot)
@@ -75,7 +81,7 @@ const canContinue = (snapshot: OrderSnapshot) => {
     commonFilter(order) &&
     order.remaining == 0
 
-  if(!snapshot.futureOrder || !snapshot.spotOrder)
+  if (!snapshot.futureOrder || !snapshot.spotOrder)
     return false
 
   const spotDone = done(snapshot.spotOrder)
@@ -102,68 +108,43 @@ const canRedo = (snapshot: OrderSnapshot) => {
 }
 
 const redo = async (
-  snapshot: OrderSnapshot,
-  manager: CcxtExchange,
-  symbol: string
+  snapshot:   OrderSnapshot,
+  manager:    CcxtExchange,
+  symbol:     string,
+  side:       'entry' | 'exit',
 ): Promise<OrderSnapshot> => {
-  try {
-    let quantity = { spot: 0, future: 0 }
+  const spotFilled   = snapshot.spotOrder?.filled   ?? 0
+  const futureFilled = snapshot.futureOrder?.filled ?? 0
+  const futSymbol    = `${symbol}:USDT`
 
-    if(snapshot.spotOrder)
-      quantity.spot = snapshot.spotOrder.side == 'buy' ?
-        snapshot.spotOrder.filled :
-        snapshot.spotOrder.remaining
+  // imbalance sempre em UNIDADES de spot
+  const imbalance = side === 'entry'
+    ? futureFilled - spotFilled
+    : spotFilled - futureFilled
 
-    const contractSize = manager.market(`${symbol}:USDT`).contractSize ?? 1
+  if (imbalance === 0) {
+    return snapshot
+  }
 
-    if(snapshot.futureOrder)
-      quantity.future = snapshot.futureOrder.side == 'sell' ?
-        snapshot.futureOrder.filled * contractSize :
-        snapshot.futureOrder.remaining * contractSize
+  // factories prontas (undefined → market order)
+  const redoSpot   = prepareCreateOrder(manager, symbol,      side === 'entry' ? 'buy'  : 'sell')
+  const redoFuture = prepareCreateOrder(manager, futSymbol,   side === 'entry' ? 'sell' : 'buy', /*market*/ true)
 
-    const redoSpot = prepareCreateOrder(manager, symbol, 'sell')
-    const redoFuture = prepareCreateOrder(manager, `${symbol}:USDT`, 'buy', true)
+  let spotOrder:   Order | undefined = snapshot.spotOrder
+  let futureOrder: Order | undefined = snapshot.futureOrder
 
-    let [spotOrder, futureOrder] = await Promise.all([
-      quantity.spot > 0 ? redoSpot(undefined, quantity.spot) : snapshot.spotOrder,
-      quantity.future > 0 ? redoFuture(undefined, quantity.future) : snapshot.futureOrder
-    ])
+  if (imbalance > 0) {
+    // perna atrasada = spot
+    spotOrder = await redoSpot(undefined, imbalance)
+  }
+  else {
+    // perna atrasada = future (usa Math.abs pra ficar +)
+    futureOrder = await redoFuture(undefined, Math.abs(imbalance))
+  }
 
-    if(!spotOrder)
-      spotOrder = { remaining: 0, filled: 0 } as Order
-
-    if(!futureOrder)
-      futureOrder = { remaining: 0, filled: 0 } as Order
-
-    spotOrder.info = {
-      source: 'redo',
-      previous: snapshot.spotOrder?.info?.previous
-    }
-
-    spotOrder.filled = (spotOrder.filled ?? 0) + (spotOrder.remaining ?? 0)
-    spotOrder.remaining = 0
-
-    futureOrder.info = {
-      source: 'redo',
-      previous: snapshot.futureOrder?.info?.previous
-    }
-
-    futureOrder.filled = (futureOrder.filled) ?? 0 + (futureOrder.remaining ?? 0)
-    futureOrder.remaining = 0
-
-    return { spotOrder, futureOrder }
-  } catch(err){
-    return { 
-      spotOrder: { 
-        remaining: 0,
-        info: { source: 'redo' }
-      } as Order,
-      
-      futureOrder: { 
-        remaining: 0,
-        info: { source: 'redo' }
-      } as Order, 
-    }
+  return {
+    spotOrder:   spotOrder   ?? { remaining: 0, filled: 0 } as Order,
+    futureOrder: futureOrder ?? { remaining: 0, filled: 0 } as Order,
   }
 }
 
@@ -173,8 +154,9 @@ export const tryCancel = async (
   snapshot: OrderSnapshot,
   spotOrdersCatch: OrderCatch,
   futureOrdersCatch: OrderCatch,
+  direction: 'entry' | 'exit'
 ): Promise<OrderSnapshot> => {
-  if(!snapshot.futureOrder && !snapshot.spotOrder)
+  if (!snapshot.futureOrder && !snapshot.spotOrder)
     return snapshot
 
   const manager = exchange.getManager()
@@ -197,7 +179,8 @@ export const tryCancel = async (
     return await redo(
       snapshot,
       manager,
-      symbol
+      symbol,
+      direction
     )
 
   const lastNonces = { spot: -1, future: -1 }
@@ -217,7 +200,8 @@ export const tryCancel = async (
       return await redo(
         snapshot,
         manager,
-        symbol
+        symbol,
+        direction
       )
   }
 }
