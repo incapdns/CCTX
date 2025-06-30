@@ -139,8 +139,6 @@ export const runExitArbitrage = async ({
     createBuyFutureOrder(futureArbitrageOrder)
   ])
 
-  tracker.resolve()
-
   const hasError =
     spotOrder.status === 'rejected' ||
     futureOrder.status === 'rejected'
@@ -179,6 +177,8 @@ export const runExitArbitrage = async ({
 
     if (result.nextFuture?.entered)
       await result.nextFuture?.promise
+
+    tracker.resolve()
   }
 
   const lastNonces = { spot: -1, future: -1 }
