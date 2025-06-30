@@ -101,59 +101,89 @@ const canRedo = (snapshot: OrderSnapshot) => {
   return spotDone && futureDone
 }
 
+type Side = 'entry' | 'exit'
+
 const redo = async (
-  snapshot:   OrderSnapshot,
-  manager:    CcxtExchange,
-  symbol:     string,
-  side:       'entry' | 'exit',
+  snapshot: OrderSnapshot,
+  manager: CcxtExchange,
+  symbol: string,
+  side: Side
 ): Promise<OrderSnapshot> => {
-  const contractSize = manager.market(`${symbol}:USDT`)?.contractSize ?? 1
+  const futSymbol = `${symbol}:USDT`
+  const mktFut = manager.market(futSymbol)!
+  const contractSize = mktFut.contractSize ?? 1
+  const minCt = mktFut.limits.amount?.min ?? 1
 
-  // 1) valores originais
-  let spotFilled   = snapshot.spotOrder?.filled   ?? 0
-  let futureFilled = (snapshot.futureOrder?.filled ?? 0) * contractSize
+  let spotFilled = snapshot.spotOrder?.filled ?? 0
+  let futureFilledCts = snapshot.futureOrder?.filled ?? 0
+  let futureFilled = futureFilledCts * contractSize
 
-  // 2) calcula o imbalance em UNIDADES de spot
-  const imbalance = side === 'entry'
-    ? futureFilled - spotFilled
-    : spotFilled - futureFilled
+  const redoSpot = prepareCreateOrder(
+    manager,
+    symbol,
+    side === 'entry' ? 'buy' : 'sell'
+  )
+  const redoFuture = prepareCreateOrder(
+    manager,
+    futSymbol,
+    side === 'entry' ? 'sell' : 'buy',
+    /* reduceOnly */ true
+  )
 
-  // 3) se já está equilibrado, devolve filled atual e remaining=0
-  if (imbalance === 0) {
-    return {
-      spotOrder:   { filled: spotFilled,   remaining: 0, symbol } as Order,
-      futureOrder: { filled: futureFilled, remaining: 0, symbol: `${symbol}:USDT` } as Order,
-    }
-  }
+  if (side === 'entry') {
+    const imbalance = futureFilled - spotFilled
+    const imbalanceCts = Math.abs(imbalance) / contractSize
 
-  // 4) factories (undefined → market order)
-  const futSymbol  = `${symbol}:USDT`
-  const redoSpot   = prepareCreateOrder(manager, symbol,    side === 'entry' ? 'buy'  : 'sell')
-  const redoFuture = prepareCreateOrder(manager, futSymbol, side === 'entry' ? 'sell' : 'buy', /*reduceOnly*/ true)
-
-  try {
-    // 5) executa apenas a perna atrasada e atualiza o filled
     if (imbalance > 0) {
-      // perna atrasada = spot
+      try {
+        await redoSpot(undefined, imbalance)
+      } catch (err) { }
       spotFilled += imbalance
-      await redoSpot(undefined, imbalance)
     }
-    else {
-      // perna atrasada = future (usa Math.abs pra ficar positivo)
-      const qty = Math.abs(imbalance)
-      futureFilled += qty
-      await redoFuture(undefined, qty)
+    else if (imbalanceCts >= minCt) {
+      const qtyUnits = Math.abs(imbalance)
+      const qtyContracts = qtyUnits / contractSize
+
+      try {
+        await redoFuture(undefined, qtyUnits)
+      } catch (err) { }
+      futureFilledCts += qtyContracts
+      futureFilled += qtyUnits
     }
-  } catch(err) {
-    //Do nothing
-  } finally {
-    futureFilled /= contractSize
+  }
+  else {
+    const spotRem = snapshot.spotOrder?.remaining ?? 0
+    const futRemCts = snapshot.futureOrder?.remaining ?? 0
+
+    if (spotRem > 0) {
+      try {
+        await redoSpot(undefined, spotRem)
+      } catch (err) { }
+      spotFilled += spotRem
+    }
+
+    if (futRemCts > 0) {
+      const futRemUnits = futRemCts * contractSize
+
+      try {
+        await redoFuture(undefined, futRemUnits)
+      } catch (err) { }
+      futureFilledCts += futRemCts
+      futureFilled += futRemUnits
+    }
   }
 
-  // 6) devolve somente os filled atualizados e remaining zero
   return {
-    spotOrder:   { filled: spotFilled,   remaining: 0, symbol } as Order,
-    futureOrder: { filled: futureFilled, remaining: 0, symbol: `${symbol}:USDT` } as Order,
+    spotOrder: {
+      filled: spotFilled,
+      remaining: 0,
+      symbol,
+    } as Order,
+    futureOrder: {
+      filled: futureFilledCts,
+      remaining: 0,
+      symbol: futSymbol,
+    } as Order,
   }
 }
 
