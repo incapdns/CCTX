@@ -30,7 +30,7 @@ const server = http.createServer((req, res) => {
 
   const entryPercent = Number(url.searchParams.get('entryPercent') ?? '0.50')
   const exitPercent = Number(url.searchParams.get('exitPercent') ?? '0')
-  const index = Number(url.searchParams.get('index') ?? '2') - 1
+  const index = Number(url.searchParams.get('index') ?? '3') - 1
 
   runArbitrage({
     symbol,
