@@ -109,8 +109,8 @@ export const runExitArbitrage = async ({
 
     const arbitrageValidation = isValidArbitrage(
       exitArbitrage,
-      spotBook,
-      futureBook,
+      step.spot.result,
+      step.future.result,
       ArbitrageDirection.Exit,
       index,
       step

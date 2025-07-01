@@ -110,8 +110,8 @@ export const runEntryArbitrage = async ({
 
     const arbitrageValidation = isValidArbitrage(
       entryArbitrage,
-      spotBook,
-      futureBook,
+      step.spot.result,
+      step.future.result,
       ArbitrageDirection.Entry,
       index,
       step
