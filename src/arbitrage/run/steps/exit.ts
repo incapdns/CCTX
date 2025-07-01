@@ -146,6 +146,7 @@ export const runExitArbitrage = async ({
     exitArbitrage,
     spotMarket,
     futureMarket,
+    ArbitrageDirection.Exit,
     validOrder
   ) ?? {}
 

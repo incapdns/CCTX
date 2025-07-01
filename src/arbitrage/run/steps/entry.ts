@@ -145,6 +145,7 @@ export const runEntryArbitrage = async ({
     entryArbitrage,
     spotMarket,
     futureMarket,
+    ArbitrageDirection.Entry,
     validOrder
   ) ?? {}
 

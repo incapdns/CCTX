@@ -221,6 +221,7 @@ export const computeOrders = (
     | ArbitrageResult<ArbitrageDirection.Exit>,
   spotMarket: Market,
   futureMarket: Market,
+  direction: ArbitrageDirection,
   validOrder: (order: ArbitrageOrder, market: Market) => boolean
 ): MaybeOrders => {
   const manager = exchange.getManager()
@@ -245,7 +246,10 @@ export const computeOrders = (
     )
     if (executed <= 0) return null
 
-    const remainingQty = entry.quantity - Math.min(entry.entered, 0)
+    const consumed = direction == ArbitrageDirection.Entry ?
+      entry.entered : entry.exited
+
+    const remainingQty = entry.quantity - consumed
     const nextRemaining = remainingQty - executed
 
     const diffQtySpot = spotMinQty - nextRemaining
