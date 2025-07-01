@@ -247,7 +247,7 @@ export const computeOrders = (
     if (executed <= 0) return null
 
     const consumed = direction == ArbitrageDirection.Entry ?
-      entry.entered : entry.exited
+      entry.temp.entry : entry.temp.exit
 
     const remainingQty = entry.quantity - consumed
     const nextRemaining = remainingQty - executed
