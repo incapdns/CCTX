@@ -155,11 +155,11 @@ export const runExitArbitrage = async ({
   if (!executed)
     return
 
-  const tracker = createOrderTracker()
-  step.lastOrder = tracker
-
   if (executed > entry.quantity - entry.temp.exit)
     return
+
+  const tracker = createOrderTracker()
+  step.lastOrder = tracker
 
   entry.temp.exit += executed
 
