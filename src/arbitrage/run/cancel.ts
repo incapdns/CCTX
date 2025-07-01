@@ -130,6 +130,35 @@ const redo = async (
     /* reduceOnly */ true
   )
 
+  const emptyResult = {
+    spotOrder: {
+      filled: 0,
+      remaining: 0
+    } as Order,
+    futureOrder: {
+      filled: 0,
+      remaining: 0
+    } as Order
+  }
+
+  if (!snapshot.spotOrder) {
+    try {
+      snapshot.futureOrder?.remaining &&
+        await redoFuture(undefined, snapshot.futureOrder.remaining)
+    } catch (err) { }
+
+    return emptyResult
+  }
+
+  if (!snapshot.futureOrder) {
+    try {
+      snapshot.spotOrder?.remaining &&
+        await redoSpot(undefined, snapshot.spotOrder.remaining)
+    } catch (err) { }
+
+    return emptyResult
+  }
+
   if (side === 'entry') {
     const imbalance = futureFilled - spotFilled
     const imbalanceCts = Math.abs(imbalance) / contractSize

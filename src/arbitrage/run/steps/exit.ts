@@ -125,9 +125,6 @@ export const runExitArbitrage = async ({
 
     if (!isValid)
       return
-
-    if (step.lastOrder && !step.lastOrder?.finished)
-      return
   } else if(spotAmount < 5 || futureAmount < 5) {
     return
   }
@@ -167,6 +164,9 @@ export const runExitArbitrage = async ({
   if (executed > entry.quantity - entry.temp.exit)
     return
 
+  if (step.lastOrder && !step.lastOrder?.finished)
+    return
+
   const tracker = createOrderTracker()
   step.lastOrder = tracker
 
@@ -181,12 +181,15 @@ export const runExitArbitrage = async ({
     spotOrder.status === 'rejected' ||
     futureOrder.status === 'rejected'
 
-  if (hasError)
+  if (hasError) {
+    tracker.resolve()
+    
     throw new CancelOrderError(
       spotOrder.status == 'fulfilled' ? spotOrder.value : null,
       futureOrder.status == 'fulfilled' ? futureOrder.value : null,
       'exit'
     )
+  }
 
   let finished = false,
     spotDone = false,
