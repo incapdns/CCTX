@@ -35,6 +35,8 @@ export interface ArbitrageNonce {
 }
 
 export const prepareCreateOrder = (exchange: CcxtExchange, symbol: string, orderSide: OrderSide, reduceOnly = false) => async (order?: ArbitrageOrder, marketQuantity?: number) => {
+  let retries = 0
+
   while (true) {
     try {
       reduceOnly = reduceOnly && orderSide === 'buy' 
@@ -81,8 +83,10 @@ export const prepareCreateOrder = (exchange: CcxtExchange, symbol: string, order
           ['429', '510'].includes(errorCode) ||
           !errorCode)
 
-      if (!shouldRetry)
+      if(!shouldRetry && ++retries > 3)
         throw error
+
+      console.error({ error })
     }
   }
 }
