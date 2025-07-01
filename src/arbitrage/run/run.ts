@@ -280,10 +280,10 @@ export const runArbitrage = async ({
     const parts = resume.split(',')
     if (parts.length > 0) {
       const values = parts.map(Number)
-      entry.temp.entry = -1
       entry.quantity = values[0]
+      entry.temp.entry = -1
+      entry.entered = -1
       entry.exited = 0
-      entry.entered = 0
       entry.profitPercent = values[1] ?? 0
     }
 

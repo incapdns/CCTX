@@ -133,8 +133,8 @@ export const runExitArbitrage = async ({
 
   const remainingQuantityForExit = Math.min(
     entry.quantity - entry.exited,
-    entry.temp.entry != -1 ?
-      entry.temp.entry :
+    entry.entered != -1 ?
+      entry.entered :
       Infinity,
     exitArbitrage.executed
   )
