@@ -2,14 +2,14 @@ import Decimal from 'decimal.js';
 import { ArbitrageDirection, ArbitrageOrder, ArbitrageRequest, ArbitrageResult, cleanResidual, findMaxPrice } from './common';
 
 export const doExitArbitrage = ({ 
-  spotBook, 
-  futureBook, 
+  spotOrders, 
+  futureOrders, 
   executed, 
   percent,
   contractSize
 }: ArbitrageRequest<ArbitrageDirection.Exit>): ArbitrageResult<ArbitrageDirection.Exit> => {
-  const spotOrders = spotBook.map(([price, qty]) => [Decimal(price), Decimal(qty)])
-  const futureOrders = futureBook.map(([price, qty]) => [Decimal(price), Decimal(qty)])
+  const spotOrdersClone = spotOrders.map(([price, qty]) => [Decimal(price), Decimal(qty)])
+  const futureOrdersClone = futureOrders.map(([price, qty]) => [Decimal(price), Decimal(qty)])
 
   let i = 0, j = 0;
 
@@ -19,14 +19,14 @@ export const doExitArbitrage = ({
   let available = Decimal(executed)
 
   while (
-    i < spotBook.length &&
-    j < futureBook.length &&
+    i < spotOrders.length &&
+    j < futureOrders.length &&
     cleanResidual(available).gt(0)
   ) {
-    const spotPrice = spotOrders[i][0]
-    const spotVolume = spotOrders[i][1]
-    const futurePrice = futureOrders[j][0]
-    const futureVolume = futureOrders[j][1].mul(contractSize)
+    const spotPrice = spotOrdersClone[i][0]
+    const spotVolume = spotOrdersClone[i][1]
+    const futurePrice = futureOrdersClone[j][0]
+    const futureVolume = futureOrdersClone[j][1].mul(contractSize)
 
     const diff = spotPrice
       .minus(futurePrice)
@@ -71,20 +71,20 @@ export const doExitArbitrage = ({
     }
 
     if (qty.gt(0)) {
-      spotOrders[i][1] = spotVolume.minus(qty)
-      futureOrders[j][1] = futureVolume.minus(qty)
+      spotOrdersClone[i][1] = spotVolume.minus(qty)
+      futureOrdersClone[j][1] = futureVolume.minus(qty)
     }
 
-    if (cleanResidual(spotOrders[i][1]).eq(0))
+    if (cleanResidual(spotOrdersClone[i][1]).eq(0))
       i++
 
-    if (cleanResidual(futureOrders[j][1]).eq(0))
+    if (cleanResidual(futureOrdersClone[j][1]).eq(0))
       j++
   }
 
   const completed = cleanResidual(available).eq(0)
 
-  const maxPrice = findMaxPrice(futureBook, spotBook, percent)
+  const maxPrice = findMaxPrice(futureOrders, spotOrders, percent)
 
   return {
     completed,

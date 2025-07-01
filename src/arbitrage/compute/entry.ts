@@ -14,15 +14,15 @@ export const isOutsideTolerance = (base: Decimal.Value, target: Decimal.Value, p
 }
 
 export const doEntryArbitrage = ({
-  spotBook,
-  futureBook,
+  spotOrders,
+  futureOrders,
   amount,
   marginQuantityPercent,
   percent,
   contractSize
 }: ArbitrageRequest<ArbitrageDirection.Entry>): ArbitrageResult<ArbitrageDirection.Entry> => {
-  const spotOrders = spotBook.map(([price, qty]) => [Decimal(price), Decimal(qty)])
-  const futureOrders = futureBook.map(([price, qty]) => [Decimal(price), Decimal(qty)])
+  const spotOrdersClone = spotOrders.map(([price, qty]) => [Decimal(price), Decimal(qty)])
+  const futureOrdersClone = futureOrders.map(([price, qty]) => [Decimal(price), Decimal(qty)])
 
   let i = 0, j = 0;
 
@@ -39,14 +39,14 @@ export const doEntryArbitrage = ({
   let completed = false
 
   while (
-    i < spotBook.length &&
-    j < futureBook.length &&
+    i < spotOrders.length &&
+    j < futureOrders.length &&
     cleanResidual(available).gt(0)
   ) {
-    const spotPrice = spotOrders[i][0]
-    const spotVolume = spotOrders[i][1]
-    const futurePrice = futureOrders[j][0]
-    const futureVolume = futureOrders[j][1].mul(contractSize)
+    const spotPrice = spotOrdersClone[i][0]
+    const spotVolume = spotOrdersClone[i][1]
+    const futurePrice = futureOrdersClone[j][0]
+    const futureVolume = futureOrdersClone[j][1].mul(contractSize)
 
     const diff = futurePrice
       .minus(spotPrice)
@@ -99,13 +99,13 @@ export const doEntryArbitrage = ({
       })
     }
 
-    spotOrders[i][1] = spotVolume.minus(currentQty)
-    futureOrders[j][1] = futureVolume.minus(currentQty)
+    spotOrdersClone[i][1] = spotVolume.minus(currentQty)
+    futureOrdersClone[j][1] = futureVolume.minus(currentQty)
 
-    if (cleanResidual(spotOrders[i][1]).eq(0))
+    if (cleanResidual(spotOrdersClone[i][1]).eq(0))
       i++
 
-    if (cleanResidual(futureOrders[j][1]).eq(0))
+    if (cleanResidual(futureOrdersClone[j][1]).eq(0))
       j++
 
     qty = qty.plus(currentQty)
@@ -134,7 +134,7 @@ export const doEntryArbitrage = ({
       }
     }
 
-  const maxPrice = findMaxPrice(spotBook, futureBook, percent)
+  const maxPrice = findMaxPrice(spotOrders, futureOrders, percent)
 
   return {
     completed,

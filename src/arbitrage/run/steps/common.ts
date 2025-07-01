@@ -1,8 +1,7 @@
 import { Exchange as CcxtExchange, Market, Order, OrderBook } from "ccxt";
 import { Exchange } from "../../../exchange";
 import { ArbitrageDirection, ArbitrageOrder, ArbitrageResult } from "../../compute/common";
-import { OrderCatch } from "../catch";
-import { cancelWithRetry, Step, syncOrder } from "../common";
+import { Step } from "../common";
 import { Entry } from "../run";
 
 export const rejectTimeout = <T>(ms: number): {
@@ -109,30 +108,28 @@ export enum VolatileDirection {
 export interface AnalyzeVolatile {
   step: Step,
   direction: VolatileDirection,
-  lastPrice: [number, number]
+  bestPrice: number
 }
 
 export const isVolatile = ({
   step,
   direction,
-  lastPrice
+  bestPrice
 }: AnalyzeVolatile): boolean => {
   const now = Date.now()
 
   const target = direction === VolatileDirection.Spot ? step.spot : step.future
 
-  if (!target?.lastPrice)
-    target!.lastPrice = [lastPrice, now]
+  if (!target?.bestPrice)
+    target!.bestPrice = [bestPrice, now]
 
-  const prevPrice = target!.lastPrice[0][0]
-  const timestamp = target!.lastPrice[1]
+  const prevPrice = target!.bestPrice[0]
+  const timestamp = target!.bestPrice[1]
   const timeDiff = now - timestamp
-  const changed = prevPrice !== lastPrice[0]
-
-  target!.lastPrice[0][1] = lastPrice[1]
+  const changed = prevPrice !== bestPrice
 
   if (changed)
-    target!.lastPrice = [lastPrice, now]
+    target!.bestPrice = [bestPrice, now]
 
   return changed || timeDiff < 3000
 }
@@ -312,7 +309,7 @@ export const createOrderTracker = () => {
   }
 }
 
-export enum ArbitrageValidation  {
+export enum ArbitrageValidation {
   Empty,
   Invalid,
   Valid
@@ -330,31 +327,35 @@ export const isValidArbitrage = <Direction extends ArbitrageDirection>(
     !arbitrage.futureOrders.length)
     return ArbitrageValidation.Empty
 
-  const spotOrders = direction == ArbitrageDirection.Entry ? 
+  const spotOrders = direction == ArbitrageDirection.Entry ?
     spotBook.asks : spotBook.bids
 
-  const futureOrders = direction == ArbitrageDirection.Entry ? 
+  const futureOrders = direction == ArbitrageDirection.Entry ?
     futureBook.bids : futureBook.asks
 
   const spotIndex = spotOrders.findIndex(([price]) => price == arbitrage.maxPrice.spot)
-  const validSpot =
-    spotIndex >= index ||
-    !isVolatile({
+  const isSpotVolatile =
+    isVolatile({
       step,
       direction: VolatileDirection.Spot,
-      lastPrice: spotOrders[spotIndex]
+      bestPrice: spotOrders[0][0]
     })
+  const validSpot =
+    spotIndex >= index ||
+    !isSpotVolatile
 
   const futureIndex = futureOrders.findIndex(([price]) => price == arbitrage.maxPrice.future)
-  const validFuture =
-    futureIndex >= index ||
-    !isVolatile({
+  const isFutureVolatile =
+    isVolatile({
       step,
       direction: VolatileDirection.Future,
-      lastPrice: futureOrders[futureIndex]
+      bestPrice: futureOrders[0][0]
     })
+  const validFuture =
+    futureIndex >= index ||
+    !isFutureVolatile
 
-  if(!validSpot || !validFuture)
+  if (!validSpot || !validFuture)
     return ArbitrageValidation.Invalid
 
   return ArbitrageValidation.Valid

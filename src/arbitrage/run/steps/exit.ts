@@ -65,8 +65,8 @@ export const runExitArbitrage = async ({
 
   let exitArbitrage = doArbitrage({
     direction: ArbitrageDirection.Exit,
-    spotBook: spotBook.bids,
-    futureBook: futureBook.asks,
+    spotOrders: spotBook.bids,
+    futureOrders: futureBook.asks,
     executed: entry.quantity * 2,
     percent,
     contractSize: futureMarket.contractSize ?? 1
@@ -93,16 +93,13 @@ export const runExitArbitrage = async ({
   if (arbitrageValidation == ArbitrageValidation.Invalid) {
     await waitTimeout(3000)
 
-    const spotIndex = spotBook.bids.findIndex(([price]) => price == exitArbitrage.maxPrice.spot)
-    const futureIndex = futureBook.asks.findIndex(([price]) => price == exitArbitrage.maxPrice.future)
-
-    spotBook.bids[spotIndex][1] = step.spot.lastPrice[0][1]
-    futureBook.asks[futureIndex][1] = step.future.lastPrice[0][1]
+    const spotOrders = step.spot.result.bids
+    const futureOrders = step.future.result.asks
 
     exitArbitrage = doArbitrage({
       direction: ArbitrageDirection.Exit,
-      spotBook: spotBook.bids,
-      futureBook: futureBook.asks,
+      spotOrders,
+      futureOrders,
       executed: entry.quantity * 2,
       percent,
       contractSize: futureMarket.contractSize ?? 1
@@ -124,8 +121,8 @@ export const runExitArbitrage = async ({
     if (!isValid)
       return
 
-    step.spot!.lastPrice[1] = Date.now()
-    step.future!.lastPrice[1] = Date.now()
+    if (step.lastOrder && !step.lastOrder?.finished)
+      return
   }
 
   if (step.executed)

@@ -34,8 +34,8 @@ export const cleanResidual = (value: Decimal, epsilon = new Decimal('1e-12')): D
   value.abs().lt(epsilon) ? new Decimal(0) : value
 
 export interface CommonRequest {
-  spotBook: [number, number][]
-  futureBook: [number, number][]
+  spotOrders: [number, number][]
+  futureOrders: [number, number][]
   percent: number
   contractSize: number
 }
