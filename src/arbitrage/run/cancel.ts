@@ -7,13 +7,20 @@ export class CancelOrderError extends Error {
   private spotOrder: Order
   private futureOrder: Order
   private direction: 'entry' | 'exit'
+  private resolve: () => void;
 
-  constructor(spotOrder: Order | null, futureOrder: Order | null, direction: 'entry' | 'exit') {
+  constructor(
+    spotOrder: Order | null,
+    futureOrder: Order | null,
+    direction: 'entry' | 'exit',
+    resolve: () => void
+  ) {
     super("Not all orders completed")
 
     this.spotOrder = spotOrder
     this.futureOrder = futureOrder
     this.direction = direction
+    this.resolve = resolve
   }
 
   public getSpotOrder() {
@@ -26,6 +33,10 @@ export class CancelOrderError extends Error {
 
   public getDirection() {
     return this.direction
+  }
+
+  public complete() {
+    this.resolve()
   }
 }
 
@@ -222,7 +233,8 @@ export const tryCancel = async (
   snapshot: OrderSnapshot,
   spotOrdersCatch: OrderCatch,
   futureOrdersCatch: OrderCatch,
-  direction: 'entry' | 'exit'
+  direction: 'entry' | 'exit',
+  resolve: () => void
 ): Promise<OrderSnapshot> => {
   if (!snapshot.futureOrder && !snapshot.spotOrder)
     return snapshot
@@ -240,16 +252,21 @@ export const tryCancel = async (
     futureOrdersCatch
   )
 
-  if (canContinue(snapshot))
+  if (canContinue(snapshot)) {
+    resolve()
     return snapshot
+  }
 
-  if (canRedo(snapshot))
-    return await redo(
+  if (canRedo(snapshot)) {
+    const result = await redo(
       snapshot,
       manager,
       symbol,
       direction
     )
+    resolve()
+    return result
+  }
 
   const lastNonces = { spot: -1, future: -1 }
 
@@ -261,15 +278,20 @@ export const tryCancel = async (
       lastNonces
     )
 
-    if (canContinue(snapshot))
+    if (canContinue(snapshot)) {
+      resolve()
       return snapshot
+    }
 
-    if (canRedo(snapshot))
-      return await redo(
+    if (canRedo(snapshot)) {
+      const result = await redo(
         snapshot,
         manager,
         symbol,
         direction
       )
+      resolve()
+      return result
+    }
   }
 }

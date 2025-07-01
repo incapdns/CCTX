@@ -187,13 +187,12 @@ export const runExitArbitrage = async ({
     spotOrder.status === 'rejected' ||
     futureOrder.status === 'rejected'
 
-  if (hasError) {
-    tracker.resolve()
-    
+  if (hasError) {    
     throw new CancelOrderError(
       spotOrder.status == 'fulfilled' ? spotOrder.value : null,
       futureOrder.status == 'fulfilled' ? futureOrder.value : null,
-      'exit'
+      'exit',
+      tracker.resolve
     )
   }
 
@@ -224,8 +223,6 @@ export const runExitArbitrage = async ({
 
     if (result.nextFuture?.entered)
       await result.nextFuture?.promise
-
-    tracker.resolve()
   }
 
   const lastNonces = { spot: -1, future: -1 }
@@ -262,12 +259,15 @@ export const runExitArbitrage = async ({
       throw new CancelOrderError(
         result.spotOrder,
         result.futureOrder,
-        'exit'
+        'exit',
+        tracker.resolve
       )
     }
   }
 
   await clearAndWait()
+
+  tracker.resolve()
 
   return {
     spotOrder: result.spotOrder,

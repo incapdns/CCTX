@@ -57,7 +57,8 @@ const catchCancelOrder = async (
     },
     spotOrdersCatch,
     futureOrdersCatch,
-    e.getDirection()
+    e.getDirection(),
+    e.complete.bind(e)
   )
 }
 
