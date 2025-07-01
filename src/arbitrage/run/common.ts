@@ -86,7 +86,8 @@ export const prepareCreateOrder = (exchange: CcxtExchange, symbol: string, order
       if(!shouldRetry && ++retries > 3)
         throw error
 
-      console.error({ error })
+      if(!shouldRetry)
+        console.error({ error })
     }
   }
 }
