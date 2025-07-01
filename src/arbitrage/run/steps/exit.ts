@@ -1,4 +1,5 @@
 import { Order } from 'ccxt';
+import Decimal from 'decimal.js';
 import { Exchange } from "../../../exchange";
 import { doArbitrage } from '../../compute';
 import { ArbitrageDirection } from "../../compute/common";
@@ -6,7 +7,7 @@ import { CancelOrderError } from '../cancel';
 import { CatchReturn, OrderCatch } from '../catch';
 import { ArbitrageNonce, createOrderValidator, prepareCreateOrder, Step, syncOrder } from '../common';
 import { Entry } from '../run';
-import { ArbitrageValidation, computeOrders, createOrderTracker, isValidArbitrage, isVolatile, rejectTimeout, Result, VolatileDirection, waitTimeout } from './common';
+import { ArbitrageValidation, computeOrders, createOrderTracker, isValidArbitrage, rejectTimeout, Result, waitTimeout } from './common';
 
 interface ExitArbitrage {
   exchange: Exchange,
@@ -59,6 +60,32 @@ export const runExitArbitrage = async ({
     step.spot!.result!,
     step.future!.result!
   ]
+
+  const spotOrdersAvg = Decimal(
+    spotBook
+      .asks
+      .reduce((previous, [_, quantity]) => previous + quantity, 0)
+  )
+    .div(spotBook.asks.length)
+    .mul(0.75)
+    .toNumber()
+
+  const futureOrdersAvg = Decimal(
+    futureBook
+      .bids
+      .reduce((previous, [_, quantity]) => previous + quantity, 0)
+  )
+    .div(futureBook.bids.length)
+    .mul(0.75)
+    .toNumber()
+
+  spotBook.asks = spotBook
+    .asks
+    .filter(([_, quantity]) => quantity >= spotOrdersAvg)
+
+  futureBook.bids = futureBook
+    .bids
+    .filter(([_, quantity]) => quantity >= futureOrdersAvg)
 
   const spotMarket = manager.market(symbol)
   const futureMarket = manager.market(`${symbol}:USDT`)
