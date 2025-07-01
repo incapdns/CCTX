@@ -95,6 +95,9 @@ export const runExitArbitrage = async ({
   const spotAmount = exitArbitrage.executed * exitArbitrage.maxPrice.spot
   const futureAmount = exitArbitrage.executed * exitArbitrage.maxPrice.future
 
+  const remainingAmountForSpot = (entry.quantity - entry.temp.exit) * exitArbitrage.maxPrice.spot
+  const remainingAmountForFuture = (entry.quantity - entry.temp.exit) * exitArbitrage.maxPrice.future
+
   if (arbitrageValidation == ArbitrageValidation.Invalid) {
     await waitTimeout(3000)
 
@@ -125,7 +128,10 @@ export const runExitArbitrage = async ({
 
     if (!isValid)
       return
-  } else if(spotAmount < 5 || futureAmount < 5) {
+  } else if(
+    (remainingAmountForSpot > 5 && spotAmount < 5) || 
+    (remainingAmountForFuture > 5 && futureAmount < 5))
+  {
     return
   }
 
