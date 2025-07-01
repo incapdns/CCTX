@@ -6,7 +6,7 @@ import { CancelOrderError } from '../cancel';
 import { CatchReturn, OrderCatch } from '../catch';
 import { ArbitrageNonce, createOrderValidator, prepareCreateOrder, Step, syncOrder } from '../common';
 import { Entry } from '../run';
-import { computeOrders, createOrderTracker, isVolatile, rejectTimeout, Result, VolatileDirection, waitTimeout } from './common';
+import { ArbitrageValidation, computeOrders, createOrderTracker, isValidArbitrage, isVolatile, rejectTimeout, Result, VolatileDirection, waitTimeout } from './common';
 
 interface EntryArbitrage {
   exchange: Exchange,
@@ -39,7 +39,7 @@ export const runEntryArbitrage = async ({
   if (!step.future?.result || !step.spot?.result)
     return
 
-  if(step.lastOrder && !step.lastOrder?.finished)
+  if (step.lastOrder && !step.lastOrder?.finished)
     return
 
   const sameSpot = arbitrageNonce.spot == step.spot?.result?.nonce
@@ -63,7 +63,7 @@ export const runEntryArbitrage = async ({
   const spotMarket = manager.market(symbol)
   const futureMarket = manager.market(`${symbol}:USDT`)
 
-  const entryArbitrage = doArbitrage({
+  let entryArbitrage = doArbitrage({
     direction: ArbitrageDirection.Entry,
     spotBook: spotBook.asks,
     futureBook: futureBook.bids,
@@ -78,37 +78,56 @@ export const runEntryArbitrage = async ({
   arbitrageNonce.spot = step.spot.result.nonce
   arbitrageNonce.future = step.future.result.nonce
 
-  if (!entryArbitrage.spotOrders.length ||
-    !entryArbitrage.futureOrders.length)
+  const arbitrageValidation = isValidArbitrage(
+    entryArbitrage,
+    spotBook,
+    futureBook,
+    ArbitrageDirection.Entry,
+    index,
+    step
+  )
+
+  if (arbitrageValidation == ArbitrageValidation.Empty)
     return
 
-  const isSpotVolatile = isVolatile(step, VolatileDirection.Spot, entryArbitrage.maxPrice.spot)
-  const spotIndex = spotBook.asks.findIndex(([price]) => price == entryArbitrage.maxPrice.spot)
-  let validSpot =
-    spotIndex >= index ||
-    !isSpotVolatile
-
-  const isFutureVolatile = isVolatile(step, VolatileDirection.Future, entryArbitrage.maxPrice.future)
-  const futureIndex = futureBook.bids.findIndex(([price]) => price == entryArbitrage.maxPrice.future)
-  let validFuture =
-    futureIndex >= index ||
-    !isFutureVolatile
-
-  if (!validFuture || !validSpot) {
+  if (arbitrageValidation == ArbitrageValidation.Invalid) {
     await waitTimeout(3000)
 
-    validSpot = isVolatile(step, VolatileDirection.Spot, entryArbitrage.maxPrice.spot)
-    validFuture = isVolatile(step, VolatileDirection.Future, entryArbitrage.maxPrice.future)
+    const spotIndex = spotBook.asks.findIndex(([price]) => price == entryArbitrage.maxPrice.spot)
+    const futureIndex = futureBook.bids.findIndex(([price]) => price == entryArbitrage.maxPrice.future)
 
-    if (validSpot)
-      step.spot!.lastPrice[1] = Date.now()
+    spotBook.bids[spotIndex][1] = step.spot.lastPrice[0][1]
+    futureBook.asks[futureIndex][1] = step.future.lastPrice[0][1]
 
-    if (validFuture)
-      step.future!.lastPrice[1] = Date.now()
+    entryArbitrage = doArbitrage({
+      direction: ArbitrageDirection.Entry,
+      spotBook: spotBook.asks,
+      futureBook: futureBook.bids,
+      percent,
+      amount: entry.quantity * 2,
+      marginQuantityPercent: 10,
+      contractSize: futureMarket.contractSize ?? 1
+    })
+
+    entryArbitrage.executed *= 0.7 // 30% less than the computed value;
+
+    const arbitrageValidation = isValidArbitrage(
+      entryArbitrage,
+      spotBook,
+      futureBook,
+      ArbitrageDirection.Entry,
+      index,
+      step
+    )
+
+    const isValid = arbitrageValidation == ArbitrageValidation.Valid
+
+    if (!isValid)
+      return
+
+    step.spot!.lastPrice[1] = Date.now()
+    step.future!.lastPrice[1] = Date.now()
   }
-
-  if (!validFuture || !validSpot)
-    return
 
   if (step.executed)
     return
@@ -117,7 +136,7 @@ export const runEntryArbitrage = async ({
   delete step.spot.result
 
   const remainingQuantityForEntry = Math.min(
-    entry.quantity - entry.entered, 
+    entry.quantity - entry.entered,
     entry.quantity - entry.temp.entry,
     entryArbitrage.executed,
   )

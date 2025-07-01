@@ -1,4 +1,4 @@
-import { Exchange as CcxtExchange, Market, Order } from "ccxt";
+import { Exchange as CcxtExchange, Market, Order, OrderBook } from "ccxt";
 import { Exchange } from "../../../exchange";
 import { ArbitrageDirection, ArbitrageOrder, ArbitrageResult } from "../../compute/common";
 import { OrderCatch } from "../catch";
@@ -14,7 +14,7 @@ export const rejectTimeout = <T>(ms: number): {
   return { timeout, promise }
 }
 
-export const waitTimeout = (ms: number): Promise<void> => 
+export const waitTimeout = (ms: number): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, ms))
 
 export interface Result {
@@ -106,11 +106,17 @@ export enum VolatileDirection {
   Future
 }
 
-export const isVolatile = (
+export interface AnalyzeVolatile {
   step: Step,
   direction: VolatileDirection,
-  lastPrice: number
-): boolean => {
+  lastPrice: [number, number]
+}
+
+export const isVolatile = ({
+  step,
+  direction,
+  lastPrice
+}: AnalyzeVolatile): boolean => {
   const now = Date.now()
 
   const target = direction === VolatileDirection.Spot ? step.spot : step.future
@@ -118,9 +124,10 @@ export const isVolatile = (
   if (!target?.lastPrice)
     target!.lastPrice = [lastPrice, now]
 
-  const [prevPrice, timestamp] = target!.lastPrice
+  const prevPrice = target!.lastPrice[0][0]
+  const timestamp = target!.lastPrice[1]
   const timeDiff = now - timestamp
-  const changed = prevPrice !== lastPrice
+  const changed = prevPrice !== lastPrice[0][0]
 
   if (changed)
     target!.lastPrice = [lastPrice, now]
@@ -219,14 +226,14 @@ export const computeOrders = (
 ): MaybeOrders => {
   const manager = exchange.getManager()
 
-  const spotMinQty     = spotMarket.limits?.amount?.min ?? 0
-  const contractSize   = futureMarket.contractSize ?? 1
-  const futureMinQty   = (futureMarket.limits?.amount?.min ?? 0) * contractSize
+  const spotMinQty = spotMarket.limits?.amount?.min ?? 0
+  const contractSize = futureMarket.contractSize ?? 1
+  const futureMinQty = (futureMarket.limits?.amount?.min ?? 0) * contractSize
 
-  const spotMinCost    = spotMarket.limits?.cost?.min ?? 0
-  const futureMinCost  = futureMarket.limits?.cost?.min ?? 0
+  const spotMinCost = spotMarket.limits?.cost?.min ?? 0
+  const futureMinCost = futureMarket.limits?.cost?.min ?? 0
 
-  const COST_BUFFER    = 1.02
+  const COST_BUFFER = 1.02
 
   let executed = Math.min(arbitrage.executed, limit)
 
@@ -242,20 +249,20 @@ export const computeOrders = (
     const remainingQty = entry.quantity - entry.entered
     const nextRemaining = remainingQty - executed
 
-    const diffQtySpot   = spotMinQty   - nextRemaining
+    const diffQtySpot = spotMinQty - nextRemaining
     const diffQtyFuture = futureMinQty - nextRemaining
 
-    const reqQtyByCostSpot = (spotMinCost * COST_BUFFER)  / arbitrage.maxPrice.spot
-    const reqQtyByCostFut  = (futureMinCost * COST_BUFFER) / arbitrage.maxPrice.future
+    const reqQtyByCostSpot = (spotMinCost * COST_BUFFER) / arbitrage.maxPrice.spot
+    const reqQtyByCostFut = (futureMinCost * COST_BUFFER) / arbitrage.maxPrice.future
 
-    const diffCostSpot   = reqQtyByCostSpot   - nextRemaining
-    const diffCostFuture = reqQtyByCostFut    - nextRemaining
+    const diffCostSpot = reqQtyByCostSpot - nextRemaining
+    const diffCostFuture = reqQtyByCostFut - nextRemaining
 
     if (nextRemaining > 0 && (
-      diffQtySpot   > 0 ||
+      diffQtySpot > 0 ||
       diffQtyFuture > 0 ||
-      diffCostSpot  > 0 ||
-      diffCostFuture> 0
+      diffCostSpot > 0 ||
+      diffCostFuture > 0
     )) {
       const maxGap = Math.max(
         diffQtySpot,
@@ -268,13 +275,13 @@ export const computeOrders = (
     }
 
     const spotOrder: ArbitrageOrder = {
-      price:    arbitrage.maxPrice.spot,
+      price: arbitrage.maxPrice.spot,
       quantity: executed
     }
-    if (!validOrder(spotOrder, spotMarket))  continue
+    if (!validOrder(spotOrder, spotMarket)) continue
 
     const futureOrder: ArbitrageOrder = {
-      price:    arbitrage.maxPrice.future,
+      price: arbitrage.maxPrice.future,
       quantity: executed
     }
     if (!validOrder(futureOrder, futureMarket)) continue
@@ -301,4 +308,52 @@ export const createOrderTracker = () => {
       resolver()
     }
   }
+}
+
+export enum ArbitrageValidation  {
+  Empty,
+  Invalid,
+  Valid
+}
+
+export const isValidArbitrage = <Direction extends ArbitrageDirection>(
+  arbitrage: ArbitrageResult<Direction>,
+  spotBook: OrderBook,
+  futureBook: OrderBook,
+  direction: Direction,
+  index: number,
+  step: Step
+): ArbitrageValidation => {
+  if (!arbitrage.spotOrders.length ||
+    !arbitrage.futureOrders.length)
+    return ArbitrageValidation.Empty
+
+  const spotOrders = direction == ArbitrageDirection.Entry ? 
+    spotBook.asks : spotBook.bids
+
+  const futureOrders = direction == ArbitrageDirection.Entry ? 
+    futureBook.bids : spotBook.asks
+
+  const spotIndex = spotOrders.findIndex(([price]) => price == arbitrage.maxPrice.spot)
+  const validSpot =
+    spotIndex >= index ||
+    !isVolatile({
+      step,
+      direction: VolatileDirection.Spot,
+      lastPrice: spotOrders[spotIndex]
+    })
+
+  const futureIndex = futureOrders.findIndex(([price]) => price == arbitrage.maxPrice.future)
+  const validFuture =
+    futureIndex >= index ||
+    !isVolatile({
+      step,
+      direction: VolatileDirection.Future,
+      lastPrice: futureOrders[futureIndex]
+    })
+
+  if(!validSpot || !validFuture)
+    return ArbitrageValidation.Invalid
+
+  return ArbitrageValidation.Valid
 }

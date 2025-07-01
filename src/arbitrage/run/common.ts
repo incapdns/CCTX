@@ -12,11 +12,11 @@ export interface Step {
   executed: boolean,
   spot?: {
     result?: OrderBook,
-    lastPrice?: [number, number],
+    lastPrice?: [[number, number], number],
   },
   future?: {
     result?: OrderBook,
-    lastPrice?: [number, number],
+    lastPrice?: [[number, number], number],
   }
   lastOrder?: {
     promise: Promise<void>,

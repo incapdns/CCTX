@@ -6,7 +6,7 @@ import { CancelOrderError } from '../cancel';
 import { CatchReturn, OrderCatch } from '../catch';
 import { ArbitrageNonce, createOrderValidator, prepareCreateOrder, Step, syncOrder } from '../common';
 import { Entry } from '../run';
-import { computeOrders, createOrderTracker, isVolatile, rejectTimeout, Result, VolatileDirection, waitTimeout } from './common';
+import { ArbitrageValidation, computeOrders, createOrderTracker, isValidArbitrage, isVolatile, rejectTimeout, Result, VolatileDirection, waitTimeout } from './common';
 
 interface ExitArbitrage {
   exchange: Exchange,
@@ -39,7 +39,7 @@ export const runExitArbitrage = async ({
   if (!step.future?.result || !step.spot?.result)
     return
 
-  if(step.lastOrder && !step.lastOrder?.finished)
+  if (step.lastOrder && !step.lastOrder?.finished)
     return
 
   const sameSpot = arbitrageNonce.spot == step.spot?.result?.nonce
@@ -63,7 +63,7 @@ export const runExitArbitrage = async ({
   const spotMarket = manager.market(symbol)
   const futureMarket = manager.market(`${symbol}:USDT`)
 
-  const exitArbitrage = doArbitrage({
+  let exitArbitrage = doArbitrage({
     direction: ArbitrageDirection.Exit,
     spotBook: spotBook.bids,
     futureBook: futureBook.asks,
@@ -77,37 +77,56 @@ export const runExitArbitrage = async ({
   arbitrageNonce.spot = step.spot.result.nonce
   arbitrageNonce.future = step.future.result.nonce
 
-  if (!exitArbitrage.spotOrders.length ||
-    !exitArbitrage.futureOrders.length)
+
+  const arbitrageValidation = isValidArbitrage(
+    exitArbitrage,
+    spotBook,
+    futureBook,
+    ArbitrageDirection.Exit,
+    index,
+    step
+  )
+
+  if (arbitrageValidation == ArbitrageValidation.Empty)
     return
 
-  const isSpotVolatile = isVolatile(step, VolatileDirection.Spot, exitArbitrage.maxPrice.spot)
-  const spotIndex = spotBook.bids.findIndex(([price]) => price == exitArbitrage.maxPrice.spot)
-  let validSpot =
-    spotIndex >= index ||
-    !isSpotVolatile
-
-  const isFutureVolatile = isVolatile(step, VolatileDirection.Future, exitArbitrage.maxPrice.future)
-  const futureIndex = futureBook.asks.findIndex(([price]) => price == exitArbitrage.maxPrice.future)
-  let validFuture =
-    futureIndex >= index ||
-    !isFutureVolatile
-
-  if (!validFuture || !validSpot) {
+  if (arbitrageValidation == ArbitrageValidation.Invalid) {
     await waitTimeout(3000)
 
-    validSpot = isVolatile(step, VolatileDirection.Spot, exitArbitrage.maxPrice.spot)
-    validFuture = isVolatile(step, VolatileDirection.Future, exitArbitrage.maxPrice.future)
+    const spotIndex = spotBook.bids.findIndex(([price]) => price == exitArbitrage.maxPrice.spot)
+    const futureIndex = futureBook.asks.findIndex(([price]) => price == exitArbitrage.maxPrice.future)
 
-    if(validSpot)
-      step.spot!.lastPrice[1] = Date.now()
+    spotBook.bids[spotIndex][1] = step.spot.lastPrice[0][1]
+    futureBook.asks[futureIndex][1] = step.future.lastPrice[0][1]
 
-    if(validFuture)
-      step.future!.lastPrice[1] = Date.now()
+    exitArbitrage = doArbitrage({
+      direction: ArbitrageDirection.Exit,
+      spotBook: spotBook.bids,
+      futureBook: futureBook.asks,
+      executed: entry.quantity * 2,
+      percent,
+      contractSize: futureMarket.contractSize ?? 1
+    })
+
+    exitArbitrage.executed *= 0.7 // 30% less than the computed value;
+
+    const arbitrageValidation = isValidArbitrage(
+      exitArbitrage,
+      spotBook,
+      futureBook,
+      ArbitrageDirection.Exit,
+      index,
+      step
+    )
+
+    const isValid = arbitrageValidation == ArbitrageValidation.Valid
+
+    if (!isValid)
+      return
+
+    step.spot!.lastPrice[1] = Date.now()
+    step.future!.lastPrice[1] = Date.now()
   }
-
-  if (!validFuture || !validSpot)
-    return
 
   if (step.executed)
     return
@@ -116,9 +135,9 @@ export const runExitArbitrage = async ({
   delete step.spot.result
 
   const remainingQuantityForExit = Math.min(
-    entry.quantity - entry.exited, 
-    entry.temp.entry != -1 ? 
-      entry.temp.entry : 
+    entry.quantity - entry.exited,
+    entry.temp.entry != -1 ?
+      entry.temp.entry :
       Infinity,
     exitArbitrage.executed
   )
@@ -133,7 +152,7 @@ export const runExitArbitrage = async ({
     validOrder
   ) ?? {}
 
-  if(!executed)
+  if (!executed)
     return
 
   const tracker = createOrderTracker()
