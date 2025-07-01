@@ -76,17 +76,17 @@ export const prepareCreateOrder = (exchange: CcxtExchange, symbol: string, order
       const errorMatch = error?.message?.match('code\.:([0-9]+)')
       const errorCode = errorMatch ? errorMatch[1] : false
 
-      const shouldRetry =
+      const shouldContinue =
         typeof error == 'object' &&
         (error?.constructor?.name == 'RateLimitExceeded' ||
           error?.name == 'RequestTimeout' ||
           ['429', '510'].includes(errorCode) ||
           !errorCode)
 
-      if(!shouldRetry && ++retries > 3)
+      if(!shouldContinue && ++retries > 3)
         throw error
 
-      if(!shouldRetry)
+      if(!shouldContinue)
         console.error({ error })
     }
   }
