@@ -129,6 +129,8 @@ export const isVolatile = ({
   const timeDiff = now - timestamp
   const changed = prevPrice !== lastPrice[0]
 
+  target!.lastPrice[0][1] = lastPrice[1]
+
   if (changed)
     target!.lastPrice = [lastPrice, now]
 
