@@ -139,8 +139,8 @@ export const runEntryArbitrage = async ({
   delete step.future.result
   delete step.spot.result
 
-  const maxAmount = Math.max(spotAmount, futureAmount)
-  const limitedQuantity = Math.min(entryArbitrage.executed, maxPerOrder / maxAmount)
+  const maxPrice = Math.max(entryArbitrage.maxPrice.spot, entryArbitrage.maxPrice.future)
+  const limitedQuantity = Math.min(entryArbitrage.executed, maxPerOrder / maxPrice)
 
   const remainingQuantityForEntry = Math.min(
     entry.quantity - entry.entered,
