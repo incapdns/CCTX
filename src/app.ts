@@ -30,6 +30,7 @@ const server = http.createServer((req, res) => {
 
   const entryPercent = Number(url.searchParams.get('entryPercent') ?? '0.50')
   const exitPercent = Number(url.searchParams.get('exitPercent') ?? '0')
+  const maxPerOrder = Number(url.searchParams.get('maxPerOrder') ?? '50')
   const index = Number(url.searchParams.get('index') ?? '3') - 1
 
   runArbitrage({
@@ -40,6 +41,7 @@ const server = http.createServer((req, res) => {
     resume,
     entryPercent,
     exitPercent,
+    maxPerOrder,
     index
   })
 

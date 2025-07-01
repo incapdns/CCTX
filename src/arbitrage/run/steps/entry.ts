@@ -18,6 +18,7 @@ interface EntryArbitrage {
   futureOrdersCatch: OrderCatch,
   timeout: number,
   percent: number,
+  maxPerOrder: number,
   index: number
 }
 
@@ -31,6 +32,7 @@ export const runEntryArbitrage = async ({
   futureOrdersCatch,
   timeout,
   percent,
+  maxPerOrder,
   index
 }: EntryArbitrage) => {
   if (step.executed)
@@ -90,6 +92,9 @@ export const runEntryArbitrage = async ({
   if (arbitrageValidation == ArbitrageValidation.Empty)
     return
 
+  const spotAmount = entryArbitrage.executed * entryArbitrage.maxPrice.spot
+  const futureAmount = entryArbitrage.executed * entryArbitrage.maxPrice.future
+
   if (arbitrageValidation == ArbitrageValidation.Invalid) {
     await waitTimeout(3000)
 
@@ -124,6 +129,8 @@ export const runEntryArbitrage = async ({
 
     if (step.lastOrder && !step.lastOrder?.finished)
       return
+  } else if(spotAmount < 5 || futureAmount < 5) {
+    return
   }
 
   if (step.executed)
@@ -132,10 +139,14 @@ export const runEntryArbitrage = async ({
   delete step.future.result
   delete step.spot.result
 
+  const maxAmount = Math.max(spotAmount, futureAmount)
+  const limitedQuantity = Math.min(entryArbitrage.executed, maxPerOrder / maxAmount)
+
   const remainingQuantityForEntry = Math.min(
     entry.quantity - entry.entered,
     entry.quantity - entry.temp.entry,
     entryArbitrage.executed,
+    limitedQuantity
   )
 
   const { spotArbitrageOrder, futureArbitrageOrder, executed } = computeOrders(
