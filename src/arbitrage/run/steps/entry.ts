@@ -146,7 +146,6 @@ export const runEntryArbitrage = async ({
   const limitedQuantity = Math.min(entryArbitrage.executed, maxPerOrder / maxPrice)
 
   const remainingQuantityForEntry = Math.min(
-    entry.quantity - entry.entered,
     entry.quantity - entry.temp.entry,
     entryArbitrage.executed,
     limitedQuantity
