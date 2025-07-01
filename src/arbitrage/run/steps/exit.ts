@@ -17,7 +17,8 @@ interface ExitArbitrage {
   spotOrdersCatch: OrderCatch,
   futureOrdersCatch: OrderCatch,
   timeout: number,
-  percent: number
+  percent: number,
+  index: number
 }
 
 export const runExitArbitrage = async ({
@@ -29,7 +30,8 @@ export const runExitArbitrage = async ({
   spotOrdersCatch,
   futureOrdersCatch,
   timeout,
-  percent
+  percent,
+  index
 }: ExitArbitrage) => {
   if (step.executed)
     return
@@ -80,13 +82,15 @@ export const runExitArbitrage = async ({
     return
 
   const isSpotVolatile = isVolatile(step, VolatileDirection.Spot, exitArbitrage.maxPrice.spot)
+  const spotIndex = spotBook.bids.findIndex(([price]) => price == exitArbitrage.maxPrice.spot)
   let validSpot =
-    exitArbitrage.spotOrders[0].price != exitArbitrage.maxPrice.spot ||
+    spotIndex >= index ||
     !isSpotVolatile
 
   const isFutureVolatile = isVolatile(step, VolatileDirection.Future, exitArbitrage.maxPrice.future)
+  const futureIndex = futureBook.asks.findIndex(([price]) => price == exitArbitrage.maxPrice.future)
   let validFuture =
-    exitArbitrage.futureOrders[0].price != exitArbitrage.maxPrice.future ||
+    futureIndex >= index ||
     !isFutureVolatile
 
   if (!validFuture || !validSpot) {

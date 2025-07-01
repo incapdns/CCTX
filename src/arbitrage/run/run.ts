@@ -16,6 +16,7 @@ export interface Arbitrage {
   resume: string,
   entryPercent: number,
   exitPercent: number,
+  index: number
 }
 
 export interface Entry {
@@ -69,7 +70,8 @@ interface RunStep {
   timeout: number,
   entry: Entry,
   symbol: string,
-  percent: number
+  percent: number,
+  index: number
 }
 
 const processAttempt = async (
@@ -121,7 +123,8 @@ const runStep = async ({
   timeout,
   entry,
   symbol,
-  percent
+  percent,
+  index
 }: RunStep) => {
   const futureSymbol = `${symbol}:USDT`
 
@@ -155,7 +158,8 @@ const runStep = async ({
         timeout,
         spotOrdersCatch,
         futureOrdersCatch,
-        percent
+        percent,
+        index
       })
         .catch(e =>
           catchCancelOrder(e, exchange, symbol, spotOrdersCatch, futureOrdersCatch)
@@ -205,7 +209,8 @@ export const runArbitrage = async ({
   timeout, 
   entryPercent, 
   exitPercent,
-  resume
+  resume,
+  index
 }: Arbitrage) => {
   const manager = exchange.getManager()
 
@@ -296,6 +301,7 @@ export const runArbitrage = async ({
       timeout,
       entry,
       symbol,
+      index,
       percent: direction == ArbitrageDirection.Entry ? 
         entryPercent : 
         exitPercent
