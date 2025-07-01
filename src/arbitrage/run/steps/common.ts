@@ -334,7 +334,7 @@ export const isValidArbitrage = <Direction extends ArbitrageDirection>(
     spotBook.asks : spotBook.bids
 
   const futureOrders = direction == ArbitrageDirection.Entry ? 
-    futureBook.bids : spotBook.asks
+    futureBook.bids : futureBook.asks
 
   const spotIndex = spotOrders.findIndex(([price]) => price == arbitrage.maxPrice.spot)
   const validSpot =
