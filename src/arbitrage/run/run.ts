@@ -81,14 +81,13 @@ const processAttempt = async (
   entry: Entry,
   step: Step,
   direction: ArbitrageDirection,
-  exchange: Exchange
+  exchange: Exchange,
+  symbol: string
 ) => {
   if (!snapshot || !snapshot.spotOrder || !snapshot.futureOrder)
     return;
 
   const manager = exchange.getManager()
-
-  const symbol = snapshot.spotOrder.symbol
 
   const contractSize = manager.market(`${symbol}:USDT`)?.contractSize ?? 1
 
@@ -145,7 +144,8 @@ const runStep = async ({
       entry,
       step,
       direction,
-      exchange
+      exchange,
+      symbol
     )
 
   const eachPromise = async (p: Promise<OrderBook>): Promise<OrderSnapshot> => {
