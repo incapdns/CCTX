@@ -15,7 +15,7 @@ addAccount(0)
 
 appendExchange(0, defaultMexcExchange)
 
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
   const url = new URL(`http://localhost/${req.url}`)
 
   const symbol = url.searchParams.get('symbol')
@@ -25,27 +25,30 @@ const server = http.createServer((req, res) => {
   const resume = url.searchParams.get('resume')
   const quantity = Number(url.searchParams.get('quantity'))
 
-  if(!(quantity > 0) && !resume)
+  if (!(quantity > 0) && !resume)
     return res.end('Invalid quantity')
 
   const entryPercent = Number(url.searchParams.get('entryPercent') ?? '0.50')
   const exitPercent = Number(url.searchParams.get('exitPercent') ?? '0')
   const maxPerOrder = Number(url.searchParams.get('maxPerOrder') ?? '10')
   const index = Number(url.searchParams.get('index') ?? '2') - 1
-
-  runArbitrage({
-    symbol,
-    exchange: getExchange(0, 'mexc'),
-    quantity,
-    timeout: 5000,
-    resume,
-    entryPercent,
-    exitPercent,
-    maxPerOrder,
-    index
-  })
+  const loop = url.searchParams.get('loop') === 'true'
 
   res.end('Ok')
+
+  do {
+    await runArbitrage({
+      symbol,
+      exchange: getExchange(0, 'mexc'),
+      quantity,
+      timeout: 5000,
+      resume,
+      entryPercent,
+      exitPercent,
+      maxPerOrder,
+      index
+    })
+  } while(loop);
 })
 
 server.listen(1000)
