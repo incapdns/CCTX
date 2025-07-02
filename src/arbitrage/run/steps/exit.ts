@@ -129,8 +129,8 @@ export const runExitArbitrage = async ({
     if (!isValid)
       return
   } else if(
-    (remainingAmountForSpot > 5 && spotAmount < 5) || 
-    (remainingAmountForFuture > 5 && futureAmount < 5))
+    (remainingAmountForSpot > 2.5 && spotAmount < 2.5) || 
+    (remainingAmountForFuture > 2.5 && futureAmount < 2.5))
   {
     return
   }
