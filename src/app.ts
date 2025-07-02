@@ -32,7 +32,7 @@ const server = http.createServer(async (req, res) => {
   const exitPercent = Number(url.searchParams.get('exitPercent') ?? '0')
   const maxPerOrder = Number(url.searchParams.get('maxPerOrder') ?? '10')
   const index = Number(url.searchParams.get('index') ?? '2') - 1
-  const loop = url.searchParams.get('loop') === 'true'
+  const loop = url.searchParams.get('loop') === 'true' && !resume
 
   res.end('Ok')
 
