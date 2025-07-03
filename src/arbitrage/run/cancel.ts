@@ -236,12 +236,14 @@ export const tryCancel = async (
   direction: 'entry' | 'exit',
   resolve: () => void
 ): Promise<OrderSnapshot> => {
-  if (!snapshot.futureOrder && !snapshot.spotOrder)
+  if (!snapshot.futureOrder && !snapshot.spotOrder) {
+    resolve()
     return snapshot
+  }
 
   const manager = exchange.getManager()
 
-  await Promise.all([
+  await Promise.allSettled([
     snapshot.spotOrder && cancelWithRetry(exchange, snapshot.spotOrder),
     snapshot.futureOrder && cancelWithRetry(exchange, snapshot.futureOrder)
   ])
