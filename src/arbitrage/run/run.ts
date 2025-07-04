@@ -95,22 +95,22 @@ const processAttempt = async (
 
   const contractSize = manager.market(`${symbol}:USDT`)?.contractSize ?? 1
 
-  const quantity = 
+  const quantity =
     (snapshot.futureOrder.filled * contractSize) ||
     snapshot.spotOrder.filled
 
   if (direction == ArbitrageDirection.Entry) {
     entry.entered += quantity
 
-    if(!loop)
+    if (!loop)
       step.executed = !isOutsideTolerance(
         entry.quantity,
         entry.entered,
         10
       )
-      
+
     entry.temp.entry = entry.entered
-  } else if(!loop) {
+  } else if (!loop) {
     entry.exited += quantity
     step.executed = entry.exited == entry.quantity
     entry.temp.exit = entry.exited
@@ -119,7 +119,7 @@ const processAttempt = async (
     entry.temp.entry = entry.entered;
   }
 
-  if(step.executed)
+  if (step.executed)
     console.warn(`Step ${direction} executed for ${snapshot.spotOrder.symbol} with quantity ${entry.quantity}`)
 }
 
@@ -218,12 +218,12 @@ const runStep = async ({
   }
 }
 
-export const runArbitrage = async ({ 
-  symbol, 
-  exchange, 
-  quantity, 
-  timeout, 
-  entryPercent, 
+export const runArbitrage = async ({
+  symbol,
+  exchange,
+  quantity,
+  timeout,
+  entryPercent,
   exitPercent,
   resume,
   maxPerOrder,
@@ -264,11 +264,6 @@ export const runArbitrage = async ({
       spot: {},
       future: {},
     },
-  }
-
-  const arbitrageNonce: ArbitrageNonce = {
-    spot: 0,
-    future: 0
   }
 
   const spotOrdersCatch = catchOrders(exchange, symbol)
@@ -313,7 +308,10 @@ export const runArbitrage = async ({
       stepManager,
       direction,
       exchange,
-      arbitrageNonce,
+      arbitrageNonce: {
+        spot: 0,
+        future: 0
+      },
       spotOrdersCatch,
       futureOrdersCatch,
       timeout,
@@ -321,8 +319,8 @@ export const runArbitrage = async ({
       symbol,
       maxPerOrder,
       index,
-      percent: direction == ArbitrageDirection.Entry ? 
-        entryPercent : 
+      percent: direction == ArbitrageDirection.Entry ?
+        entryPercent :
         exitPercent,
       loop
     })
