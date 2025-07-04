@@ -267,7 +267,7 @@ export const runExitArbitrage = async ({
 
   await clearAndWait()
 
-  tracker.resolve.bind(tracker)()
+  tracker.resolve()
 
   return {
     spotOrder: result.spotOrder,
