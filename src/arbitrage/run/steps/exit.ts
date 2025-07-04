@@ -192,7 +192,7 @@ export const runExitArbitrage = async ({
       spotOrder.status == 'fulfilled' ? spotOrder.value : null,
       futureOrder.status == 'fulfilled' ? futureOrder.value : null,
       'exit',
-      tracker.resolve
+      tracker.resolve.bind(tracker)
     )
   }
 
@@ -260,14 +260,14 @@ export const runExitArbitrage = async ({
         result.spotOrder,
         result.futureOrder,
         'exit',
-        tracker.resolve
+        tracker.resolve.bind(tracker)
       )
     }
   }
 
   await clearAndWait()
 
-  tracker.resolve()
+  tracker.resolve.bind(tracker)()
 
   return {
     spotOrder: result.spotOrder,

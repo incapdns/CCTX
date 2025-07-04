@@ -190,7 +190,7 @@ export const runEntryArbitrage = async ({
       spotOrder.status == 'fulfilled' ? spotOrder.value : null,
       futureOrder.status == 'fulfilled' ? futureOrder.value : null,
       'entry',
-      tracker.resolve
+      tracker.resolve.bind(tracker)
     )
   }
 
@@ -258,7 +258,7 @@ export const runEntryArbitrage = async ({
         result.spotOrder,
         result.futureOrder,
         'entry',
-        tracker.resolve
+        tracker.resolve.bind(tracker)
       )
     }
   }
