@@ -265,6 +265,8 @@ export const runEntryArbitrage = async ({
 
   await clearAndWait()
 
+  tracker.resolve()
+
   return {
     spotOrder: result.spotOrder,
     futureOrder: result.futureOrder,
