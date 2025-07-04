@@ -19,7 +19,8 @@ interface ExitArbitrage {
   timeout: number,
   percent: number,
   maxPerOrder: number,
-  index: number
+  index: number,
+  loop: boolean
 }
 
 export const runExitArbitrage = async ({
@@ -33,7 +34,8 @@ export const runExitArbitrage = async ({
   timeout,
   percent,
   maxPerOrder,
-  index
+  index,
+  loop
 }: ExitArbitrage) => {
   if (step.executed)
     return
@@ -128,10 +130,9 @@ export const runExitArbitrage = async ({
 
     if (!isValid)
       return
-  } else if(
-    (remainingAmountForSpot > 2.5 && spotAmount < 2.5) || 
-    (remainingAmountForFuture > 2.5 && futureAmount < 2.5))
-  {
+  } else if (
+    (remainingAmountForSpot > 2.5 && spotAmount < 2.5) ||
+    (remainingAmountForFuture > 2.5 && futureAmount < 2.5)) {
     return
   }
 
@@ -147,7 +148,7 @@ export const runExitArbitrage = async ({
   const remainingQuantityForExit = Math.min(
     entry.quantity - entry.temp.exit,
     entry.entered != -1 ?
-      entry.entered - entry.temp.exit:
+      entry.entered - entry.temp.exit :
       Infinity,
     exitArbitrage.executed,
     limitedQuantity
@@ -176,7 +177,8 @@ export const runExitArbitrage = async ({
   const tracker = createOrderTracker()
   step.lastOrder = tracker
 
-  entry.temp.exit += executed
+  if (!loop)
+    entry.temp.exit += executed
 
   const [spotOrder, futureOrder] = await Promise.allSettled([
     createSellSpotOrder(spotArbitrageOrder),
@@ -187,7 +189,7 @@ export const runExitArbitrage = async ({
     spotOrder.status === 'rejected' ||
     futureOrder.status === 'rejected'
 
-  if (hasError) {    
+  if (hasError) {
     throw new CancelOrderError(
       spotOrder.status == 'fulfilled' ? spotOrder.value : null,
       futureOrder.status == 'fulfilled' ? futureOrder.value : null,

@@ -36,19 +36,18 @@ const server = http.createServer(async (req, res) => {
 
   res.end('Ok')
 
-  do {
-    await runArbitrage({
-      symbol,
-      exchange: getExchange(0, 'mexc'),
-      quantity,
-      timeout: 5000,
-      resume,
-      entryPercent,
-      exitPercent,
-      maxPerOrder,
-      index
-    })
-  } while(loop);
+  runArbitrage({
+    symbol,
+    exchange: getExchange(0, 'mexc'),
+    quantity,
+    timeout: 5000,
+    resume,
+    entryPercent,
+    exitPercent,
+    maxPerOrder,
+    index,
+    loop
+  })
 })
 
 server.listen(1000)

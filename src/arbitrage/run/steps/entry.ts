@@ -19,7 +19,8 @@ interface EntryArbitrage {
   timeout: number,
   percent: number,
   maxPerOrder: number,
-  index: number
+  index: number,
+  loop: boolean
 }
 
 export const runEntryArbitrage = async ({

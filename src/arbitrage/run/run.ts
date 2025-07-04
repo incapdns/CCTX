@@ -17,7 +17,8 @@ export interface Arbitrage {
   entryPercent: number,
   exitPercent: number,
   maxPerOrder: number,
-  index: number
+  index: number,
+  loop: boolean
 }
 
 export interface Entry {
@@ -74,7 +75,8 @@ interface RunStep {
   symbol: string,
   percent: number,
   maxPerOrder: number,
-  index: number
+  index: number,
+  loop: boolean
 }
 
 const processAttempt = async (
@@ -83,7 +85,8 @@ const processAttempt = async (
   step: Step,
   direction: ArbitrageDirection,
   exchange: Exchange,
-  symbol: string
+  symbol: string,
+  loop: boolean
 ) => {
   if (!snapshot || !snapshot.spotOrder || !snapshot.futureOrder)
     return;
@@ -99,16 +102,21 @@ const processAttempt = async (
   if (direction == ArbitrageDirection.Entry) {
     entry.entered += quantity
 
-    step.executed = !isOutsideTolerance(
-      entry.quantity,
-      entry.entered,
-      10
-    )
+    if(!loop)
+      step.executed = !isOutsideTolerance(
+        entry.quantity,
+        entry.entered,
+        10
+      )
+      
     entry.temp.entry = entry.entered
-  } else {
+  } else if(!loop) {
     entry.exited += quantity
     step.executed = entry.exited == entry.quantity
     entry.temp.exit = entry.exited
+  } else {
+    entry.entered -= quantity;
+    entry.temp.entry = entry.entered;
   }
 
   if(step.executed)
@@ -127,7 +135,8 @@ const runStep = async ({
   symbol,
   percent,
   maxPerOrder,
-  index
+  index,
+  loop
 }: RunStep) => {
   const futureSymbol = `${symbol}:USDT`
 
@@ -146,7 +155,8 @@ const runStep = async ({
       step,
       direction,
       exchange,
-      symbol
+      symbol,
+      loop
     )
 
   const eachPromise = async (p: Promise<OrderBook>): Promise<OrderSnapshot> => {
@@ -164,7 +174,8 @@ const runStep = async ({
         futureOrdersCatch,
         maxPerOrder,
         percent,
-        index
+        index,
+        loop
       })
         .catch(e =>
           catchCancelOrder(e, exchange, symbol, spotOrdersCatch, futureOrdersCatch)
@@ -216,7 +227,8 @@ export const runArbitrage = async ({
   exitPercent,
   resume,
   maxPerOrder,
-  index
+  index,
+  loop
 }: Arbitrage) => {
   const manager = exchange.getManager()
 
@@ -311,7 +323,8 @@ export const runArbitrage = async ({
       index,
       percent: direction == ArbitrageDirection.Entry ? 
         entryPercent : 
-        exitPercent
+        exitPercent,
+      loop
     })
   )
 
