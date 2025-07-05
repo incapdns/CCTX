@@ -27,12 +27,15 @@ export interface Entry {
   quantity: number,
   /** Total quantity that was entered */
   entered: number,
-  /** Total quantity that was exited */
+  /** Total quantity that was exited !loop */
   exited: number,
+  /** Temporary entry and exit */
   temp: {
     entry: number,
     exit: number
   }
+  /** Temporary snaphot of entry snaphot for loop */
+  entrySnaphot: number
 }
 
 const catchCancelOrder = async (
@@ -110,6 +113,7 @@ const processAttempt = async (
       )
 
     entry.temp.entry = entry.entered
+    entry.entrySnaphot = entry.entered
   } else if (!loop) {
     entry.exited += quantity
     step.executed = entry.exited == entry.quantity
@@ -117,6 +121,7 @@ const processAttempt = async (
   } else {
     entry.entered -= quantity;
     entry.temp.entry = entry.entered;
+    entry.entrySnaphot = entry.entered
   }
 
   if (step.executed)
@@ -244,7 +249,8 @@ export const runArbitrage = async ({
     temp: {
       entry: 0,
       exit: 0
-    }
+    },
+    entrySnaphot: 0
   }
 
   if (exchange.running.includes(symbol))

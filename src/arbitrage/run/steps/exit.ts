@@ -147,9 +147,11 @@ export const runExitArbitrage = async ({
 
   const remainingQuantityForExit = Math.min(
     entry.quantity - entry.temp.exit,
-    entry.entered != -1 ?
-      entry.entered - entry.temp.exit :
-      Infinity,
+    loop ? 
+      entry.entrySnaphot :
+      entry.entered != -1 ?
+        entry.entered - entry.temp.exit :
+        Infinity,
     exitArbitrage.executed,
     limitedQuantity
   )
@@ -179,6 +181,8 @@ export const runExitArbitrage = async ({
 
   if (!loop)
     entry.temp.exit += executed
+  else
+    entry.entrySnaphot -= executed
 
   const [spotOrder, futureOrder] = await Promise.allSettled([
     createSellSpotOrder(spotArbitrageOrder),
