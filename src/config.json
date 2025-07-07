@@ -7,7 +7,7 @@
             "options": {
                 "defaultType": "spot",
                 "adjustForTimeDifference": true,
-                "recvWindow": 5000
+                "recvWindow": 10000
             },
             "webToken": "WEBd640ba2683815e4fcae30ac8e774e584842bc843fe8d5aec35a25f26161e2c38"
         }

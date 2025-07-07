@@ -42,8 +42,8 @@ const applyFix = (url: string, params: RequestInit): [string, RequestInit, (resp
 
 let counter = 0;
 
-export const fixMexc = (mexc: mexc, authorization: string): mexc => {
-  mexc.loadTimeDifference();
+export const fixMexc = async (mexc: mexc, authorization: string): Promise<mexc> => {
+  await mexc.loadTimeDifference();
 
   mexc.AbortError = DOMException
   mexc.FetchError = TypeError

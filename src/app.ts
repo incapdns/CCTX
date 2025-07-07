@@ -7,14 +7,6 @@ import { fixMexc, prepareFix } from './fixes/mexc';
 
 prepareFix()
 
-const mexc = config.exchanges.mexc
-
-const defaultMexcExchange = fixMexc(new ccxt.mexc(mexc), mexc.webToken)
-
-addAccount(0)
-
-appendExchange(0, defaultMexcExchange)
-
 const server = http.createServer(async (req, res) => {
   const url = new URL(`http://localhost/${req.url}`)
 
@@ -50,4 +42,12 @@ const server = http.createServer(async (req, res) => {
   })
 })
 
-server.listen(1000)
+server.listen(1000, async () => {
+  const mexc = config.exchanges.mexc
+
+  const defaultMexcExchange = await fixMexc(new ccxt.mexc(mexc), mexc.webToken)
+
+  addAccount(0)
+
+  appendExchange(0, defaultMexcExchange)
+})
