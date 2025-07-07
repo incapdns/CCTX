@@ -9,17 +9,17 @@ import { rejectTimeout } from './arbitrage/run/steps/common';
 
 prepareFix()
 
-const mexc = config.exchanges.mexc
-
-const defaultMexcExchange = fixMexc(new ccxt.mexc(mexc), mexc.webToken)
-
-addAccount(0)
-
-appendExchange(0, defaultMexcExchange)
-
 const test = async () => {
+  const mexc = config.exchanges.mexc
+
+  const defaultMexcExchange = await fixMexc(new ccxt.mexc(mexc), mexc.webToken)
+
+  addAccount(0)
+
+  appendExchange(0, defaultMexcExchange)
+
   const timeout = rejectTimeout<void>(1000)
-  while(true) {
+  while (true) {
     const res = await Promise.race([
       timeout.promise,
       []
