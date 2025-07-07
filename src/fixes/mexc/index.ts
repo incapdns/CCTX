@@ -43,6 +43,8 @@ const applyFix = (url: string, params: RequestInit): [string, RequestInit, (resp
 let counter = 0;
 
 export const fixMexc = (mexc: mexc, authorization: string): mexc => {
+  mexc.loadTimeDifference();
+
   mexc.AbortError = DOMException
   mexc.FetchError = TypeError
   mexc.fetchImplementation = (defaultUrl: string, defaultParams: RequestInit) => {
