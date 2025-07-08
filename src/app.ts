@@ -42,7 +42,7 @@ const server = http.createServer(async (req, res) => {
   })
 })
 
-server.listen(1000, async () => {
+server.listen(1000, '0.0.0.0', async () => {
   const mexc = config.exchanges.mexc
 
   const defaultMexcExchange = await fixMexc(new ccxt.mexc(mexc), mexc.webToken)
